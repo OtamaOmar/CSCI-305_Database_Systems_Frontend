@@ -1,6 +1,38 @@
+@config "../tailwind.config.js";
 @import "tailwindcss";
 
 body {
   margin: 0;
-  min-height: 100vh;
+}
+
+.pulse-live path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 240;
+  stroke-dashoffset: 240;
+  animation: live-pulse 1.8s linear infinite;
+}
+
+@keyframes live-pulse {
+  0% {
+    stroke-dashoffset: 240;
+    opacity: 0.35;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.8;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
