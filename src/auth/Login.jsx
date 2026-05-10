@@ -12,7 +12,7 @@ export default function LoginPage() {
     setLoading(true);
 
     setTimeout(() => {
-      navigate({ to: "/" });
+      navigate({ to: "/dashboard" });
     }, 400);
   }
 
@@ -34,9 +34,9 @@ export default function LoginPage() {
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <AuthField
-          label="Work email"
-          type="email"
-          placeholder="you@hospital.org"
+          label="Username"
+          type="text"
+          placeholder="Enter any username"
           required
         />
 
