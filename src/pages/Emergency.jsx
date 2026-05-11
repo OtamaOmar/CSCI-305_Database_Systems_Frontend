@@ -144,6 +144,12 @@ function Emergency() {
               >
                 Emergency
               </button>
+              <Link
+                to="/staff"
+                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                Staff
+              </Link>
             </nav>
           </div>
 
@@ -199,7 +205,7 @@ function Emergency() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex min-w-60 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base dark:border-slate-700 dark:bg-slate-900">
             <Search className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             <input
               value={query}

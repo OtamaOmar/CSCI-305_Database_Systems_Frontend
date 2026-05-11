@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Bell, Filter, HeartPulse, MoreHorizontal, Moon, Plus, Search, Sun } from 'lucide-react'
+import { Bell, Filter, HeartPulse, Moon, Pencil, Plus, Search, Sun, Trash2 } from 'lucide-react'
 
 const patients = [
   {
@@ -66,7 +66,10 @@ const levelStyles = {
 function Patients() {
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState('All')
+  const [patientRows, setPatientRows] = useState(patients)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingPatient, setEditingPatient] = useState(null)
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -80,8 +83,63 @@ function Patients() {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
+  function handleAddPatient(event) {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const id = String(formData.get('id') || '').trim() || `ED-${Date.now().toString().slice(-4)}`
+
+    const nextPatient = {
+      id,
+      name: String(formData.get('name') || '').trim(),
+      age: Number(formData.get('age') || 0),
+      gender: String(formData.get('gender') || '').trim(),
+      condition: String(formData.get('condition') || '').trim(),
+      doctor: String(formData.get('doctor') || '').trim(),
+      bay: String(formData.get('bay') || '').trim(),
+      level: String(formData.get('level') || '').trim(),
+    }
+
+    setPatientRows((prev) => [nextPatient, ...prev])
+    event.currentTarget.reset()
+    setIsAddOpen(false)
+  }
+
+  function openEditPatient(patient) {
+    setEditingPatient(patient)
+    setIsEditOpen(true)
+  }
+
+  function handleEditPatient(event) {
+    event.preventDefault()
+
+    if (!editingPatient) return
+
+    const formData = new FormData(event.currentTarget)
+    const updatedPatient = {
+      id: editingPatient.id,
+      name: String(formData.get('name') || '').trim(),
+      age: Number(formData.get('age') || 0),
+      gender: String(formData.get('gender') || '').trim(),
+      condition: String(formData.get('condition') || '').trim(),
+      doctor: String(formData.get('doctor') || '').trim(),
+      bay: String(formData.get('bay') || '').trim(),
+      level: String(formData.get('level') || '').trim(),
+    }
+
+    setPatientRows((prev) => prev.map((item) => (item.id === editingPatient.id ? updatedPatient : item)))
+    setIsEditOpen(false)
+    setEditingPatient(null)
+  }
+
+  function handleDeletePatient(patientId) {
+    const ok = window.confirm('Delete this patient record?')
+    if (!ok) return
+
+    setPatientRows((prev) => prev.filter((item) => item.id !== patientId))
+  }
+
   const filtered = useMemo(() => {
-    return patients.filter((patient) => {
+    return patientRows.filter((patient) => {
       const lowered = query.toLowerCase()
       const matchQuery = !query
         || patient.name.toLowerCase().includes(lowered)
@@ -90,7 +148,7 @@ function Patients() {
       const matchLevel = level === 'All' || patient.level === level
       return matchQuery && matchLevel
     })
-  }, [query, level])
+  }, [query, level, patientRows])
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -121,7 +179,6 @@ function Patients() {
               </Link>
               <Link
                 to="/doctors"
-                to="/doctors"
                 className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 Doctors
@@ -131,6 +188,12 @@ function Patients() {
                 className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 Emergency
+              </Link>
+              <Link
+                to="/staff"
+                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                Staff
               </Link>
             </nav>
           </div>
@@ -170,7 +233,7 @@ function Patients() {
           <div>
             <h1 className="text-5xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Patients</h1>
             <p className="mt-2 text-xl text-slate-600 dark:text-slate-400">
-              {patients.length} total - {filtered.length} shown
+              {patientRows.length} total - {filtered.length} shown
             </p>
           </div>
 
@@ -184,7 +247,7 @@ function Patients() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex min-w-60 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base dark:border-slate-700 dark:bg-slate-900">
             <Search className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             <input
               value={query}
@@ -253,13 +316,25 @@ function Patients() {
                       {patient.level}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-right">
-                    <button
-                      type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditPatient(patient)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePatient(patient.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -295,11 +370,12 @@ function Patients() {
               </button>
             </div>
 
-            <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
+            <form className="space-y-4" onSubmit={handleAddPatient}>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Patient ID</span>
                   <input
+                    name="id"
                     type="text"
                     placeholder="ED-2842"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
@@ -308,8 +384,10 @@ function Patients() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Full name</span>
                   <input
+                    name="name"
                     type="text"
                     placeholder="Patient name"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
@@ -319,14 +397,20 @@ function Patients() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Age</span>
                   <input
+                    name="age"
                     type="number"
                     placeholder="35"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Gender</span>
-                  <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <select
+                    name="gender"
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
                     <option value="">Select gender</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -338,16 +422,20 @@ function Patients() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Condition</span>
                   <input
+                    name="condition"
                     type="text"
                     placeholder="Primary condition"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Assigned doctor</span>
                   <input
+                    name="doctor"
                     type="text"
                     placeholder="Doctor name"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
@@ -357,14 +445,20 @@ function Patients() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bay</span>
                   <input
+                    name="bay"
                     type="text"
                     placeholder="Bay 01"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Emergency level</span>
-                  <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <select
+                    name="level"
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
                     <option value="">Select level</option>
                     <option value="Critical">Critical</option>
                     <option value="Urgent">Urgent</option>
@@ -372,15 +466,6 @@ function Patients() {
                   </select>
                 </label>
               </div>
-
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
-                <textarea
-                  rows={3}
-                  placeholder="Additional notes"
-                  className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
-                />
-              </label>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
@@ -395,6 +480,148 @@ function Patients() {
                   className="rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90"
                 >
                   Save patient
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isEditOpen && editingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm dark:bg-slate-950/70">
+          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Edit patient</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Update patient information.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditOpen(false)
+                  setEditingPatient(null)
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+
+            <form className="space-y-4" onSubmit={handleEditPatient}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Patient ID</span>
+                  <input
+                    type="text"
+                    value={editingPatient.id}
+                    disabled
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Full name</span>
+                  <input
+                    name="name"
+                    type="text"
+                    defaultValue={editingPatient.name}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Age</span>
+                  <input
+                    name="age"
+                    type="number"
+                    defaultValue={editingPatient.age}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Gender</span>
+                  <select
+                    name="gender"
+                    defaultValue={editingPatient.gender}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <option value="">Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Condition</span>
+                  <input
+                    name="condition"
+                    type="text"
+                    defaultValue={editingPatient.condition}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Assigned doctor</span>
+                  <input
+                    name="doctor"
+                    type="text"
+                    defaultValue={editingPatient.doctor}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bay</span>
+                  <input
+                    name="bay"
+                    type="text"
+                    defaultValue={editingPatient.bay}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Emergency level</span>
+                  <select
+                    name="level"
+                    defaultValue={editingPatient.level}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <option value="">Select level</option>
+                    <option value="Critical">Critical</option>
+                    <option value="Urgent">Urgent</option>
+                    <option value="Stable">Stable</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditOpen(false)
+                    setEditingPatient(null)
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90"
+                >
+                  Update patient
                 </button>
               </div>
             </form>

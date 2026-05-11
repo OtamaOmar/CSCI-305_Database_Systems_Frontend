@@ -3,8 +3,11 @@ import { Link } from '@tanstack/react-router'
 import {
   Activity,
   AlertTriangle,
+  AlertCircle,
   Bell,
+  CalendarDays,
   ClipboardList,
+  Contact,
   HeartPulse,
   MoreHorizontal,
   Moon,
@@ -13,6 +16,7 @@ import {
   UserPlus,
   Ambulance,
   BedDouble,
+  Building2,
   FileText,
 } from 'lucide-react'
 
@@ -49,12 +53,29 @@ const overviewCards = [
     icon: Activity,
     iconClass: 'text-slate-700 dark:text-slate-200',
   },
+  {
+    title: 'Room occupancy',
+    value: '68%',
+    note: '54 of 80 rooms occupied',
+    noteClass: 'text-slate-500 dark:text-slate-400',
+    icon: Building2,
+    iconClass: 'text-slate-700 dark:text-slate-200',
+  },
+  {
+    title: 'Appointments today',
+    value: '42',
+    note: '9 pending confirmation',
+    noteClass: 'text-slate-500 dark:text-slate-400',
+    icon: CalendarDays,
+    iconClass: 'text-slate-700 dark:text-slate-200',
+  },
 ]
 
 const quickActions = [
   { label: 'Register patient', sub: 'Open workflow', icon: UserPlus, to: '/patient' },
   { label: 'Incoming ambulance', sub: 'Open workflow', icon: Ambulance },
   { label: 'New triage', sub: 'Open workflow', icon: ClipboardList },
+  { label: 'Staff schedule', sub: 'View shifts', icon: CalendarDays, to: '/staff' },
   { label: 'Generate report', sub: 'Open workflow', icon: FileText },
 ]
 
@@ -72,6 +93,33 @@ const doctorRows = [
   { initials: 'C', name: 'Dr. Mei Chen', role: 'Pediatrics', status: 'Available' },
   { initials: 'B', name: 'Dr. Tom Becker', role: 'Cardiology', status: 'On call' },
 ]
+
+const emergencyAlerts = [
+  {
+    id: 'AL-401',
+    title: 'Code Red - Trauma Bay 1',
+    detail: 'Multi-trauma arrival ETA 4 min · Team A activated',
+    level: 'Critical',
+  },
+  {
+    id: 'AL-402',
+    title: 'ICU threshold warning',
+    detail: 'Only 12 ICU beds free · prepare overflow plan',
+    level: 'Warning',
+  },
+  {
+    id: 'AL-403',
+    title: 'Ambulance inbound',
+    detail: 'Cardiac case inbound from North Zone · ETA 7 min',
+    level: 'Info',
+  },
+]
+
+const alertToneClass = {
+  Critical: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300',
+  Warning: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
+  Info: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300',
+}
 
 const levelClass = {
   Critical: 'bg-brand/10 text-brand',
@@ -94,6 +142,7 @@ function Dashboard() {
       || window.matchMedia('(prefers-color-scheme: dark)').matches
     )
   })
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
@@ -103,13 +152,30 @@ function Dashboard() {
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-              <HeartPulse className="h-4 w-4" />
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
+                <HeartPulse className="h-4 w-4" />
+              </div>
+              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                Pulse<span className="text-brand">ED</span>
+              </p>
             </div>
-            <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-              Pulse<span className="text-brand">ED</span>
-            </p>
+
+            <nav className="hidden items-center gap-2 text-sm md:flex">
+              <Link
+                to="/dashboard"
+                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/charts"
+                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                Charts
+              </Link>
+            </nav>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -122,21 +188,55 @@ function Dashboard() {
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
-            <button
-              type="button"
+            <Link
+              to="/contact-us"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Contact className="h-4 w-4" />
+              Contact
+            </Link>
+
+            <Link
+              to="/notifications"
               className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              aria-label="Notifications"
             >
               <Bell className="h-4 w-4" />
-            </button>
+            </Link>
 
-            <div className="hidden items-center gap-2.5 sm:flex">
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                SA
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dr. Sara Ahmed</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">St. Mercy General</p>
-              </div>
+            <div className="relative hidden items-center gap-2.5 sm:flex">
+              <button
+                type="button"
+                onClick={() => setIsMenuOpen((value) => !value)}
+                className="flex items-center gap-2.5 rounded-xl px-2 py-1 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  SA
+                </div>
+                <div className="leading-tight text-left">
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dr. Sara Ahmed</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">St. Mercy General</p>
+                </div>
+              </button>
+
+              {isMenuOpen && (
+                <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                  <Link
+                    to="/settings"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Settings
+                  </Link>
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Profile settings
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -163,7 +263,7 @@ function Dashboard() {
           </Link>
         </div>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {overviewCards.map((card) => {
             const Icon = card.icon
 
@@ -310,6 +410,38 @@ function Dashboard() {
                   </div>
 
                   <p className={`shrink-0 text-sm font-medium ${statusClass[row.status]}`}>{row.status}</p>
+                </li>
+              ))}
+            </ul>
+          </article>
+        </section>
+
+        <section className="mt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+              Emergency alerts
+            </h2>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Live feed</span>
+          </div>
+
+          <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+            <ul>
+              {emergencyAlerts.map((alert) => (
+                <li
+                  key={alert.id}
+                  className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 last:border-b-0 dark:border-slate-700"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{alert.title}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{alert.detail}</p>
+                  </div>
+
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${alertToneClass[alert.level]}`}
+                  >
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    {alert.level}
+                  </span>
                 </li>
               ))}
             </ul>

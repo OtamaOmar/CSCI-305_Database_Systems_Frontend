@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Bell, Filter, HeartPulse, MoreHorizontal, Moon, Plus, Search, Sun } from 'lucide-react'
+import { Bell, Filter, HeartPulse, Moon, Pencil, Plus, Search, Sun, Trash2 } from 'lucide-react'
 
 const doctors = [
   {
@@ -52,7 +52,10 @@ const statusStyles = {
 function Doctors() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All')
+  const [doctorRows, setDoctorRows] = useState(doctors)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingDoctor, setEditingDoctor] = useState(null)
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -66,8 +69,61 @@ function Doctors() {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
+  function handleAddDoctor(event) {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const id = String(formData.get('id') || '').trim() || `DR-${Date.now().toString().slice(-4)}`
+
+    const nextDoctor = {
+      id,
+      name: String(formData.get('name') || '').trim(),
+      email: String(formData.get('email') || '').trim(),
+      specialty: String(formData.get('specialty') || '').trim(),
+      department: String(formData.get('department') || '').trim(),
+      shift: String(formData.get('shift') || '').trim(),
+      status: String(formData.get('status') || '').trim(),
+    }
+
+    setDoctorRows((prev) => [nextDoctor, ...prev])
+    event.currentTarget.reset()
+    setIsAddOpen(false)
+  }
+
+  function openEditDoctor(doctor) {
+    setEditingDoctor(doctor)
+    setIsEditOpen(true)
+  }
+
+  function handleEditDoctor(event) {
+    event.preventDefault()
+
+    if (!editingDoctor) return
+
+    const formData = new FormData(event.currentTarget)
+    const updatedDoctor = {
+      id: editingDoctor.id,
+      name: String(formData.get('name') || '').trim(),
+      email: String(formData.get('email') || '').trim(),
+      specialty: String(formData.get('specialty') || '').trim(),
+      department: String(formData.get('department') || '').trim(),
+      shift: String(formData.get('shift') || '').trim(),
+      status: String(formData.get('status') || '').trim(),
+    }
+
+    setDoctorRows((prev) => prev.map((item) => (item.id === editingDoctor.id ? updatedDoctor : item)))
+    setIsEditOpen(false)
+    setEditingDoctor(null)
+  }
+
+  function handleDeleteDoctor(doctorId) {
+    const ok = window.confirm('Delete this doctor record?')
+    if (!ok) return
+
+    setDoctorRows((prev) => prev.filter((item) => item.id !== doctorId))
+  }
+
   const filtered = useMemo(() => {
-    return doctors.filter((doctor) => {
+    return doctorRows.filter((doctor) => {
       const lowered = query.toLowerCase()
       const matchQuery = !query
         || doctor.name.toLowerCase().includes(lowered)
@@ -77,7 +133,7 @@ function Doctors() {
       const matchStatus = status === 'All' || doctor.status === status
       return matchQuery && matchStatus
     })
-  }, [query, status])
+  }, [query, status, doctorRows])
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -118,6 +174,12 @@ function Doctors() {
               >
                 Emergency
               </Link>
+              <Link
+                to="/staff"
+                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                Staff
+              </Link>
             </nav>
           </div>
 
@@ -156,7 +218,7 @@ function Doctors() {
           <div>
             <h1 className="text-5xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Doctors &amp; Staff</h1>
             <p className="mt-2 text-xl text-slate-600 dark:text-slate-400">
-              {doctors.length} total - {filtered.length} shown
+              {doctorRows.length} total - {filtered.length} shown
             </p>
           </div>
 
@@ -170,7 +232,7 @@ function Doctors() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex min-w-60 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base dark:border-slate-700 dark:bg-slate-900">
             <Search className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             <input
               value={query}
@@ -239,13 +301,25 @@ function Doctors() {
                       {doctor.status}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-right">
-                    <button
-                      type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditDoctor(doctor)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDoctor(doctor.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -281,11 +355,12 @@ function Doctors() {
               </button>
             </div>
 
-            <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
+            <form className="space-y-4" onSubmit={handleAddDoctor}>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Doctor ID</span>
                   <input
+                    name="id"
                     type="text"
                     placeholder="DR-1005"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
@@ -294,8 +369,10 @@ function Doctors() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Full name</span>
                   <input
+                    name="name"
                     type="text"
                     placeholder="Dr. Full name"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
@@ -305,8 +382,10 @@ function Doctors() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
                   <input
+                    name="email"
                     type="email"
                     placeholder="doctor@stmercy.org"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
@@ -324,16 +403,20 @@ function Doctors() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Specialty</span>
                   <input
+                    name="specialty"
                     type="text"
                     placeholder="Specialty"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Department</span>
                   <input
+                    name="department"
                     type="text"
                     placeholder="Department"
+                    required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
@@ -342,7 +425,11 @@ function Doctors() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Shift</span>
-                  <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <select
+                    name="shift"
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
                     <option value="">Select shift</option>
                     <option value="Morning">Morning</option>
                     <option value="Evening">Evening</option>
@@ -351,7 +438,11 @@ function Doctors() {
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>
-                  <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <select
+                    name="status"
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
                     <option value="">Select status</option>
                     <option value="On duty">On duty</option>
                     <option value="On call">On call</option>
@@ -382,6 +473,139 @@ function Doctors() {
                   className="rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90"
                 >
                   Save doctor
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isEditOpen && editingDoctor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm dark:bg-slate-950/70">
+          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Edit doctor</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Update doctor profile details.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditOpen(false)
+                  setEditingDoctor(null)
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+
+            <form className="space-y-4" onSubmit={handleEditDoctor}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Doctor ID</span>
+                  <input
+                    type="text"
+                    value={editingDoctor.id}
+                    disabled
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Full name</span>
+                  <input
+                    name="name"
+                    type="text"
+                    defaultValue={editingDoctor.name}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
+                  <input
+                    name="email"
+                    type="email"
+                    defaultValue={editingDoctor.email}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Specialty</span>
+                  <input
+                    name="specialty"
+                    type="text"
+                    defaultValue={editingDoctor.specialty}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Department</span>
+                  <input
+                    name="department"
+                    type="text"
+                    defaultValue={editingDoctor.department}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Shift</span>
+                  <select
+                    name="shift"
+                    defaultValue={editingDoctor.shift}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <option value="">Select shift</option>
+                    <option value="Morning">Morning</option>
+                    <option value="Evening">Evening</option>
+                    <option value="Night">Night</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>
+                  <select
+                    name="status"
+                    defaultValue={editingDoctor.status}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <option value="">Select status</option>
+                    <option value="On duty">On duty</option>
+                    <option value="On call">On call</option>
+                    <option value="Off duty">Off duty</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditOpen(false)
+                    setEditingDoctor(null)
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90"
+                >
+                  Update doctor
                 </button>
               </div>
             </form>
