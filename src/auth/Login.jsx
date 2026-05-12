@@ -7,13 +7,29 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
 
-    setTimeout(() => {
+    const data = new FormData(e.target);
+    const email = data.get("email");
+    const password = data.get("password");
+
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Login failed.");
+      localStorage.setItem("token", json.token);
       navigate({ to: "/dashboard" });
-    }, 400);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -36,6 +52,7 @@ export default function LoginPage() {
         <AuthField
           label="Username"
           type="text"
+          name="email"
           placeholder="Enter any username"
           required
         />
@@ -43,6 +60,7 @@ export default function LoginPage() {
         <AuthField
           label="Password"
           type="password"
+          name="password"
           placeholder="••••••••"
           required
         />

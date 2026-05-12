@@ -7,13 +7,33 @@ export default function SignupPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
 
-    setTimeout(() => {
-      navigate({ to: "/" });
-    }, 400);
+    const data = new FormData(e.target);
+    const body = {
+      first_name: data.get("first_name"),
+      last_name:  data.get("last_name"),
+      email:      data.get("email"),
+      hospital:   data.get("hospital"),
+      password:   data.get("password"),
+    };
+
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Registration failed.");
+      navigate({ to: "/login" });
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -34,19 +54,21 @@ export default function SignupPage() {
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <AuthField label="First name" placeholder="John" required />
-          <AuthField label="Last name" placeholder="Doe" required />
+          <AuthField label="First name" name="first_name" placeholder="John" required />
+          <AuthField label="Last name"  name="last_name"  placeholder="Doe"  required />
         </div>
 
         <AuthField
           label="Work email"
           type="email"
+          name="email"
           placeholder="you@hospital.org"
           required
         />
 
         <AuthField
           label="Hospital / Organization"
+          name="hospital"
           placeholder="St. Mercy General"
           required
         />
@@ -54,6 +76,7 @@ export default function SignupPage() {
         <AuthField
           label="Password"
           type="password"
+          name="password"
           placeholder="At least 8 characters"
           required
         />
