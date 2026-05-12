@@ -2,53 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle, Bell, CheckCircle2, Clock, HeartPulse, Info, Moon, ShieldCheck, Siren, Sun } from 'lucide-react'
 
-const emergencyAlerts = [
-  {
-    id: 'AL-501',
-    title: 'Code Red - Trauma Bay 2',
-    message: 'Multi-trauma patient inbound, ETA 5 min. Trauma team B activated.',
-    time: '2 min ago',
-    level: 'Critical',
-  },
-  {
-    id: 'AL-502',
-    title: 'ICU capacity warning',
-    message: 'ICU occupancy 92%. Prepare step-down beds for overflow.',
-    time: '12 min ago',
-    level: 'Warning',
-  },
-  {
-    id: 'AL-503',
-    title: 'Ambulance inbound',
-    message: 'Cardiac case inbound from North Zone. ETA 9 min.',
-    time: '20 min ago',
-    level: 'Info',
-  },
-]
-
-const systemNotifications = [
-  {
-    id: 'SYS-201',
-    title: 'Backup completed',
-    message: 'Nightly backup finished successfully for patient records.',
-    time: 'Today, 03:10',
-    icon: CheckCircle2,
-  },
-  {
-    id: 'SYS-202',
-    title: 'Security patch applied',
-    message: 'System patch 3.4.1 installed. No downtime detected.',
-    time: 'Yesterday, 22:30',
-    icon: ShieldCheck,
-  },
-  {
-    id: 'SYS-203',
-    title: 'Reminder: shift briefing',
-    message: 'Morning shift briefing scheduled for 06:45 in Ops room.',
-    time: 'Yesterday, 18:00',
-    icon: Info,
-  },
-]
+const iconMap = { CheckCircle2, ShieldCheck, Info }
 
 const alertToneClass = {
   Critical: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300',
@@ -57,6 +11,8 @@ const alertToneClass = {
 }
 
 function Notifications() {
+  const [emergencyAlerts, setEmergencyAlerts] = useState([])
+  const [systemNotifications, setSystemNotifications] = useState([])
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -66,6 +22,19 @@ function Notifications() {
     )
   })
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  useEffect(() => {
+    fetch('http://localhost:5000/api/notifications')
+      .then((res) => res.json())
+      .then((data) => {
+        setEmergencyAlerts(data.filter((item) => item.type === 'emergency'))
+        setSystemNotifications(
+          data
+            .filter((item) => item.type === 'system')
+            .map((item) => ({ ...item, icon: iconMap[item.icon] ?? Info })),
+        )
+      })
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
