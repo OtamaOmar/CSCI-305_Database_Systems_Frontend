@@ -2,9 +2,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AuthLayout } from "./AuthLayout";
 import AuthField from "./AuthField";
+import { useAlert } from "../components/AlertProvider";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { notify } = useAlert();
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
@@ -24,9 +26,12 @@ export default function LoginPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Login failed.");
       localStorage.setItem("token", json.token);
+      if (json.user) {
+        localStorage.setItem("user", JSON.stringify(json.user));
+      }
       navigate({ to: "/dashboard" });
     } catch (err) {
-      alert(err.message);
+      notify({ tone: "error", message: err.message });
     } finally {
       setLoading(false);
     }

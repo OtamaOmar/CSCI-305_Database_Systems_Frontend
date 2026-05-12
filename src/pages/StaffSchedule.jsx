@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { Bell, CalendarDays, Clock, HeartPulse, Moon, Sun, Users } from 'lucide-react'
+import TopBar from '../components/TopBar'
+import { CalendarDays, Clock, Users } from 'lucide-react'
 
 const shiftSummary = [
   {
@@ -101,71 +101,19 @@ function StaffSchedule() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-                <HeartPulse className="h-4 w-4" />
-              </div>
-              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                Pulse<span className="text-brand">ED</span>
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              <Link
-                to="/dashboard"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/patient"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Patients
-              </Link>
-              <Link
-                to="/doctors"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Doctors
-              </Link>
-              <Link
-                to="/emergency"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Emergency
-              </Link>
-              <Link
-                to="/staff"
-                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Staff
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDark((value) => !value)}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            <button
-              type="button"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </header>
+      <TopBar
+        navItems={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Patients', to: '/patient' },
+          { label: 'Doctors', to: '/doctors' },
+          { label: 'Emergency', to: '/emergency' },
+          { label: 'Staff', to: '/staff' },
+        ]}
+        activePath="/staff"
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((value) => !value)}
+        showNotifications
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6">

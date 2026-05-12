@@ -1,75 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import TopBar from '../components/TopBar'
+import { useAlert } from '../components/AlertProvider'
 import {
   Activity,
   AlertTriangle,
   AlertCircle,
-  Bell,
   CalendarDays,
   ClipboardList,
-  Contact,
-  HeartPulse,
   MoreHorizontal,
-  Moon,
   Stethoscope,
-  Sun,
   UserPlus,
   Ambulance,
-  BedDouble,
-  Building2,
   FileText,
 } from 'lucide-react'
-
-const overviewCards = [
-  {
-    title: 'Emergency cases today',
-    value: '128',
-    note: '+12 vs yesterday',
-    noteClass: 'text-brand',
-    icon: AlertTriangle,
-    iconClass: 'text-brand',
-  },
-  {
-    title: 'Active doctors',
-    value: '24',
-    note: '8 on shift now',
-    noteClass: 'text-slate-500 dark:text-slate-400',
-    icon: Stethoscope,
-    iconClass: 'text-slate-700 dark:text-slate-200',
-  },
-  {
-    title: 'ICU availability',
-    value: '12 / 40',
-    note: '30% beds free',
-    noteClass: 'text-slate-500 dark:text-slate-400',
-    icon: BedDouble,
-    iconClass: 'text-slate-700 dark:text-slate-200',
-  },
-  {
-    title: 'Avg. wait time',
-    value: '8m 24s',
-    note: '↓ 18% this week',
-    noteClass: 'text-slate-500 dark:text-slate-400',
-    icon: Activity,
-    iconClass: 'text-slate-700 dark:text-slate-200',
-  },
-  {
-    title: 'Room occupancy',
-    value: '68%',
-    note: '54 of 80 rooms occupied',
-    noteClass: 'text-slate-500 dark:text-slate-400',
-    icon: Building2,
-    iconClass: 'text-slate-700 dark:text-slate-200',
-  },
-  {
-    title: 'Appointments today',
-    value: '42',
-    note: '9 pending confirmation',
-    noteClass: 'text-slate-500 dark:text-slate-400',
-    icon: CalendarDays,
-    iconClass: 'text-slate-700 dark:text-slate-200',
-  },
-]
 
 const quickActions = [
   { label: 'Register patient', sub: 'Open workflow', icon: UserPlus, to: '/patient' },
@@ -77,42 +21,6 @@ const quickActions = [
   { label: 'New triage', sub: 'Open workflow', icon: ClipboardList },
   { label: 'Staff schedule', sub: 'View shifts', icon: CalendarDays, to: '/staff' },
   { label: 'Generate report', sub: 'Open workflow', icon: FileText },
-]
-
-const caseRows = [
-  { initials: 'AK', name: 'Adan Khalid', id: 'ED-2841', note: 'Chest pain · 42M · Bay 03', level: 'Critical' },
-  { initials: 'ML', name: 'Maria Lopez', id: 'ED-2840', note: 'Fracture · 28F · Bay 07', level: 'Urgent' },
-  { initials: 'YT', name: 'Yuki Tanaka', id: 'ED-2839', note: 'Fever · 8M · Bay 12', level: 'Stable' },
-  { initials: 'OS', name: 'Omar Said', id: 'ED-2838', note: 'Trauma · 51M · Bay 01', level: 'Critical' },
-  { initials: 'LP', name: 'Lina Park', id: 'ED-2837', note: 'Asthma · 34F · Bay 09', level: 'Urgent' },
-]
-
-const doctorRows = [
-  { initials: 'A', name: 'Dr. Sara Ahmed', role: 'ED Lead', status: 'Available' },
-  { initials: 'N', name: 'Dr. Karim Nasser', role: 'Trauma', status: 'In surgery' },
-  { initials: 'C', name: 'Dr. Mei Chen', role: 'Pediatrics', status: 'Available' },
-  { initials: 'B', name: 'Dr. Tom Becker', role: 'Cardiology', status: 'On call' },
-]
-
-const emergencyAlerts = [
-  {
-    id: 'AL-401',
-    title: 'Code Red - Trauma Bay 1',
-    detail: 'Multi-trauma arrival ETA 4 min · Team A activated',
-    level: 'Critical',
-  },
-  {
-    id: 'AL-402',
-    title: 'ICU threshold warning',
-    detail: 'Only 12 ICU beds free · prepare overflow plan',
-    level: 'Warning',
-  },
-  {
-    id: 'AL-403',
-    title: 'Ambulance inbound',
-    detail: 'Cardiac case inbound from North Zone · ETA 7 min',
-    level: 'Info',
-  },
 ]
 
 const alertToneClass = {
@@ -131,9 +39,33 @@ const statusClass = {
   Available: 'text-emerald-600 dark:text-emerald-400',
   'In surgery': 'text-brand',
   'On call': 'text-slate-500 dark:text-slate-400',
+  'On duty': 'text-emerald-600 dark:text-emerald-400',
+  'Off duty': 'text-rose-500 dark:text-rose-300',
+}
+
+const STATUS_FALLBACK = 'text-slate-500 dark:text-slate-400'
+
+function getInitials(value) {
+  if (!value) return '--'
+  return value
+    .replace('Dr. ', '')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
+function parseDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date
 }
 
 function Dashboard() {
+  const { notify } = useAlert()
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -142,105 +74,204 @@ function Dashboard() {
       || window.matchMedia('(prefers-color-scheme: dark)').matches
     )
   })
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  const [cases, setCases] = useState([])
+  const [doctors, setDoctors] = useState([])
+  const [patients, setPatients] = useState([])
+  const [alerts, setAlerts] = useState([])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchList = async (url, label) => {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`${label} request failed.`)
+      const data = await response.json()
+      return Array.isArray(data) ? data : []
+    }
+
+    const loadDashboard = async () => {
+      const [casesResult, doctorsResult, patientsResult, alertsResult] = await Promise.allSettled([
+        fetchList('http://localhost:5000/api/cases', 'Cases'),
+        fetchList('http://localhost:5000/api/doctors', 'Doctors'),
+        fetchList('http://localhost:5000/api/patients', 'Patients'),
+        fetchList('http://localhost:5000/api/notifications', 'Alerts'),
+      ])
+
+      if (!isMounted) return
+
+      if (casesResult.status === 'fulfilled') {
+        setCases(casesResult.value)
+      } else {
+        console.error(casesResult.reason)
+        notify({ tone: 'error', message: 'Failed to load emergency cases.' })
+      }
+
+      if (doctorsResult.status === 'fulfilled') {
+        setDoctors(doctorsResult.value)
+      } else {
+        console.error(doctorsResult.reason)
+        notify({ tone: 'error', message: 'Failed to load doctors.' })
+      }
+
+      if (patientsResult.status === 'fulfilled') {
+        setPatients(patientsResult.value)
+      } else {
+        console.error(patientsResult.reason)
+        notify({ tone: 'error', message: 'Failed to load patients.' })
+      }
+
+      if (alertsResult.status === 'fulfilled') {
+        setAlerts(alertsResult.value)
+      } else {
+        console.error(alertsResult.reason)
+        notify({ tone: 'error', message: 'Failed to load alerts.' })
+      }
+    }
+
+    loadDashboard()
+
+    return () => {
+      isMounted = false
+    }
+  }, [notify])
+
+  const overviewCards = useMemo(() => {
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+
+    const casesToday = cases.filter((item) => {
+      const date = parseDate(item.created_at || item.arrival_time)
+      return date && date >= startOfToday && date < startOfTomorrow
+    }).length
+
+    const casesYesterday = cases.filter((item) => {
+      const date = parseDate(item.created_at || item.arrival_time)
+      return date && date >= startOfYesterday && date < startOfToday
+    }).length
+
+    const casesDelta = casesToday - casesYesterday
+    const casesNote = casesToday || casesYesterday
+      ? `${casesDelta >= 0 ? '+' : ''}${casesDelta} vs yesterday`
+      : 'No cases logged yet'
+
+    const openCases = cases.filter((item) => item.status && item.status !== 'Discharged').length
+    const onDutyCount = doctors.filter((doctor) => doctor.status === 'On duty').length
+    const onCallCount = doctors.filter((doctor) => doctor.status === 'On call').length
+    const criticalPatients = patients.filter((patient) => patient.level === 'Critical').length
+    const criticalAlertCount = alerts.filter((alert) => alert.level === 'Critical').length
+
+    return [
+      {
+        title: 'Emergency cases today',
+        value: String(casesToday),
+        note: casesNote,
+        noteClass: 'text-brand',
+        icon: AlertTriangle,
+        iconClass: 'text-brand',
+      },
+      {
+        title: 'Active doctors',
+        value: String(doctors.length),
+        note: `${onDutyCount} on shift now`,
+        noteClass: 'text-slate-500 dark:text-slate-400',
+        icon: Stethoscope,
+        iconClass: 'text-slate-700 dark:text-slate-200',
+      },
+      {
+        title: 'Active patients',
+        value: String(patients.length),
+        note: `${criticalPatients} critical`,
+        noteClass: 'text-slate-500 dark:text-slate-400',
+        icon: ClipboardList,
+        iconClass: 'text-slate-700 dark:text-slate-200',
+      },
+      {
+        title: 'Open emergency cases',
+        value: String(openCases),
+        note: `${cases.length - openCases} discharged`,
+        noteClass: 'text-slate-500 dark:text-slate-400',
+        icon: AlertCircle,
+        iconClass: 'text-slate-700 dark:text-slate-200',
+      },
+      {
+        title: 'On-call doctors',
+        value: String(onCallCount),
+        note: `${onDutyCount} currently on duty`,
+        noteClass: 'text-slate-500 dark:text-slate-400',
+        icon: CalendarDays,
+        iconClass: 'text-slate-700 dark:text-slate-200',
+      },
+      {
+        title: 'Emergency alerts',
+        value: String(alerts.length),
+        note: `${criticalAlertCount} critical`,
+        noteClass: 'text-slate-500 dark:text-slate-400',
+        icon: Activity,
+        iconClass: 'text-slate-700 dark:text-slate-200',
+      },
+    ]
+  }, [alerts, cases, doctors, patients])
+
+  const caseRows = useMemo(() => {
+    return cases.slice(0, 5).map((item) => {
+      const genderInitial = item.gender ? item.gender[0] : ''
+      const noteParts = [
+        item.complaint,
+        item.age ? `${item.age}${genderInitial}` : null,
+        item.room,
+      ].filter(Boolean)
+
+      return {
+        id: item.id,
+        name: item.name,
+        initials: getInitials(item.name),
+        note: noteParts.join(' · '),
+        level: item.severity,
+      }
+    })
+  }, [cases])
+
+  const doctorRows = useMemo(() => {
+    return doctors.slice(0, 4).map((doctor) => ({
+      initials: getInitials(doctor.name),
+      name: doctor.name,
+      role: doctor.specialty || doctor.department || doctor.shift || 'Staff',
+      status: doctor.status,
+    }))
+  }, [doctors])
+
+  const emergencyAlerts = useMemo(() => {
+    return alerts.slice(0, 3).map((alert) => ({
+      id: alert.id,
+      title: alert.title,
+      detail: alert.message,
+      level: alert.level,
+    }))
+  }, [alerts])
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-                <HeartPulse className="h-4 w-4" />
-              </div>
-              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                Pulse<span className="text-brand">ED</span>
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              <Link
-                to="/dashboard"
-                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/charts"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Charts
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDark((value) => !value)}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            <Link
-              to="/contact-us"
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Contact className="h-4 w-4" />
-              Contact
-            </Link>
-
-            <Link
-              to="/notifications"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              aria-label="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-            </Link>
-
-            <div className="relative hidden items-center gap-2.5 sm:flex">
-              <button
-                type="button"
-                onClick={() => setIsMenuOpen((value) => !value)}
-                className="flex items-center gap-2.5 rounded-xl px-2 py-1 transition hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  SA
-                </div>
-                <div className="leading-tight text-left">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dr. Sara Ahmed</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">St. Mercy General</p>
-                </div>
-              </button>
-
-              {isMenuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                  <Link
-                    to="/settings"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    Settings
-                  </Link>
-                  <Link
-                    to="/profile"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    Profile settings
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <TopBar
+        navItems={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Charts', to: '/charts' },
+        ]}
+        activePath="/dashboard"
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((value) => !value)}
+        showContact
+        showNotifications
+        notificationsAsLink
+        showUserMenu
+        heightClass="h-14"
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -342,7 +373,9 @@ function Dashboard() {
                 >
                   Active emergency cases
                 </Link>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Updated just now</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {caseRows.length ? 'Updated recently' : 'No case updates yet'}
+                </p>
               </div>
               <Link
                 to="/emergency"
@@ -379,6 +412,12 @@ function Dashboard() {
                   </div>
                 </li>
               ))}
+
+              {caseRows.length === 0 && (
+                <li className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                  No emergency cases available.
+                </li>
+              )}
             </ul>
           </article>
 
@@ -390,7 +429,9 @@ function Dashboard() {
               >
                 Active doctors
               </Link>
-              <p className="text-sm text-slate-500 dark:text-slate-400">8 on shift</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {doctors.filter((doctor) => doctor.status === 'On duty').length} on shift
+              </p>
             </div>
 
             <ul>
@@ -409,9 +450,17 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  <p className={`shrink-0 text-sm font-medium ${statusClass[row.status]}`}>{row.status}</p>
+                  <p className={`shrink-0 text-sm font-medium ${statusClass[row.status] || STATUS_FALLBACK}`}>
+                    {row.status}
+                  </p>
                 </li>
               ))}
+
+              {doctorRows.length === 0 && (
+                <li className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                  No doctors available.
+                </li>
+              )}
             </ul>
           </article>
         </section>
@@ -437,13 +486,19 @@ function Dashboard() {
                   </div>
 
                   <span
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${alertToneClass[alert.level]}`}
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${alertToneClass[alert.level] || alertToneClass.Info}`}
                   >
                     <AlertCircle className="h-3.5 w-3.5" />
-                    {alert.level}
+                    {alert.level || 'Info'}
                   </span>
                 </li>
               ))}
+
+              {emergencyAlerts.length === 0 && (
+                <li className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                  No alerts available.
+                </li>
+              )}
             </ul>
           </article>
         </section>

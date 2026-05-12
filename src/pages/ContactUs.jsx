@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useAlert } from '../components/AlertProvider'
 import { Headset, Hospital, Mail, MapPin, Phone, Send, Sun, Moon } from 'lucide-react'
 
 function ContactUs() {
+  const { notify } = useAlert()
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -11,6 +13,20 @@ function ContactUs() {
       || window.matchMedia('(prefers-color-scheme: dark)').matches
     )
   })
+  const [currentUser] = useState(() => {
+    if (typeof window === 'undefined') return null
+
+    try {
+      const storedUser = localStorage.getItem('user')
+      return storedUser ? JSON.parse(storedUser) : null
+    } catch {
+      return null
+    }
+  })
+
+  const displayName = currentUser
+    ? [currentUser.first_name, currentUser.last_name].filter(Boolean).join(' ') || currentUser.email
+    : ''
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
@@ -18,7 +34,11 @@ function ContactUs() {
 
   function handleSubmit(event) {
     event.preventDefault()
-    window.alert('Your message has been submitted successfully.')
+    notify({
+      tone: 'success',
+      title: 'Message sent',
+      message: 'Your message has been submitted successfully.',
+    })
     event.currentTarget.reset()
   }
 
@@ -102,6 +122,7 @@ function ContactUs() {
                       type="text"
                       required
                       placeholder="Your full name"
+                      defaultValue={displayName}
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                     />
                   </label>

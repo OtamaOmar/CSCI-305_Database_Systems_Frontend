@@ -1,64 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { Bell, Filter, HeartPulse, MoreHorizontal, Moon, Plus, Search, Siren, Sun } from 'lucide-react'
-
-const cases = [
-  {
-    id: 'EC-1042',
-    name: 'Adan Khalid',
-    age: 42,
-    gender: 'Male',
-    complaint: 'Acute chest pain, suspected MI',
-    room: 'Trauma 1',
-    doctor: 'Dr. Sara Ahmed',
-    severity: 'Critical',
-    status: 'In treatment',
-  },
-  {
-    id: 'EC-1041',
-    name: 'Omar Said',
-    age: 51,
-    gender: 'Male',
-    complaint: 'Multi-trauma from RTA',
-    room: 'Trauma 2',
-    doctor: 'Dr. Karim Nasser',
-    severity: 'Critical',
-    status: 'In treatment',
-  },
-  {
-    id: 'EC-1040',
-    name: 'Maria Lopez',
-    age: 28,
-    gender: 'Female',
-    complaint: 'Closed tibia fracture',
-    room: 'Bay 07',
-    doctor: 'Dr. Karim Nasser',
-    severity: 'Urgent',
-    status: 'Stabilized',
-  },
-  {
-    id: 'EC-1039',
-    name: 'Lina Park',
-    age: 34,
-    gender: 'Female',
-    complaint: 'Severe asthma exacerbation',
-    room: 'Bay 09',
-    doctor: 'Dr. Tom Becker',
-    severity: 'Urgent',
-    status: 'In treatment',
-  },
-  {
-    id: 'EC-1038',
-    name: 'Yuki Tanaka',
-    age: 8,
-    gender: 'Male',
-    complaint: 'High fever, suspected viral',
-    room: 'Bay 12',
-    doctor: 'Dr. Mei Chen',
-    severity: 'Stable',
-    status: 'Discharged',
-  },
-]
+import TopBar from '../components/TopBar'
+import { useAlert } from '../components/AlertProvider'
+import { Filter, MoreHorizontal, Plus, Search, Siren } from 'lucide-react'
 
 const statusFilters = ['All', 'Incoming', 'In treatment', 'Stabilized', 'Discharged']
 
@@ -76,8 +19,11 @@ const statusStyles = {
 }
 
 function Emergency() {
+  const { notify } = useAlert()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All')
+  const [caseRows, setCaseRows] = useState([])
+  const [doctorOptions, setDoctorOptions] = useState([])
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -92,96 +38,97 @@ function Emergency() {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
+  async function fetchCases() {
+    try {
+      const response = await fetch('http://localhost:5000/api/cases')
+      if (!response.ok) throw new Error('Failed to load cases.')
+      const data = await response.json()
+      setCaseRows(data)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  async function fetchDoctors() {
+    try {
+      const response = await fetch('http://localhost:5000/api/doctors')
+      if (!response.ok) throw new Error('Failed to load doctors.')
+      const data = await response.json()
+      setDoctorOptions(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error(err)
+      notify({ tone: 'error', message: err.message })
+    }
+  }
+
+  useEffect(() => {
+    fetchCases()
+    fetchDoctors()
+  }, [])
+
+  async function handleAddCase(event) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    const id = `EC-${Date.now().toString().slice(-6)}`
+    const arrivalTime = String(formData.get('arrival_time') || '').trim()
+
+    const nextCase = {
+      id,
+      name: String(formData.get('name') || '').trim(),
+      age: Number(formData.get('age') || 0),
+      gender: String(formData.get('gender') || '').trim(),
+      complaint: String(formData.get('complaint') || '').trim(),
+      room: String(formData.get('room') || '').trim(),
+      doctor: String(formData.get('doctor') || '').trim() || 'Unassigned',
+      severity: String(formData.get('severity') || '').trim(),
+      status: String(formData.get('status') || '').trim(),
+      arrival_time: arrivalTime ? arrivalTime.replace('T', ' ') : null,
+      notes: String(formData.get('notes') || '').trim(),
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextCase),
+      })
+      if (!response.ok) throw new Error('Failed to add case.')
+      await fetchCases()
+      form.reset()
+      setIsAddOpen(false)
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
+  }
+
   const filtered = useMemo(() => {
-    return cases.filter((item) => {
+    return caseRows.filter((item) => {
       const lowered = query.toLowerCase()
       const matchQuery = !query
-        || item.name.toLowerCase().includes(lowered)
-        || item.id.toLowerCase().includes(lowered)
-        || item.complaint.toLowerCase().includes(lowered)
+        || (item.name || '').toLowerCase().includes(lowered)
+        || (item.id || '').toLowerCase().includes(lowered)
+        || (item.complaint || '').toLowerCase().includes(lowered)
       const matchStatus = status === 'All' || item.status === status
       return matchQuery && matchStatus
     })
-  }, [query, status])
+  }, [query, status, caseRows])
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-                <HeartPulse className="h-4 w-4" />
-              </div>
-              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                Pulse<span className="text-brand">ED</span>
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              <Link
-                to="/dashboard"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/patient"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Patients
-              </Link>
-              
-              <Link
-                to="/doctors"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Doctors
-              </Link>
-              <button
-                type="button"
-                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Emergency
-              </button>
-              <Link
-                to="/staff"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Staff
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDark((value) => !value)}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            <button
-              type="button"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
-
-            <div className="hidden items-center gap-2.5 sm:flex">
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                SA
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dr. Sara Ahmed</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">St. Mercy General</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <TopBar
+        navItems={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Patients', to: '/patient' },
+          { label: 'Doctors', to: '/doctors' },
+          { label: 'Emergency', to: '/emergency' },
+          { label: 'Staff', to: '/staff' },
+        ]}
+        activePath="/emergency"
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((value) => !value)}
+        showNotifications
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -191,7 +138,7 @@ function Emergency() {
               Emergency cases
             </h1>
             <p className="mt-2 text-xl text-slate-600 dark:text-slate-400">
-              {cases.length} total - {filtered.length} shown
+              {caseRows.length} total - {filtered.length} shown
             </p>
           </div>
 
@@ -262,7 +209,7 @@ function Emergency() {
                       <div>
                         <p className="font-semibold text-slate-900 dark:text-slate-100">{item.name}</p>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {item.id} - {item.age} {item.gender[0]}
+                          {item.id} - {item.age} {item.gender ? item.gender[0] : ''}
                         </p>
                       </div>
                     </div>
@@ -322,30 +269,30 @@ function Emergency() {
               </button>
             </div>
 
-            <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
+            <form className="space-y-4" onSubmit={handleAddCase}>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Case ID</span>
-                  <input
-                    type="text"
-                    placeholder="EC-1043"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
-                  />
-                </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Patient name</span>
                   <input
+                    name="name"
                     type="text"
                     placeholder="Patient full name"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
+                <div className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Case ID</span>
+                  <div className="w-full rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Auto-generated on save
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Age</span>
                   <input
+                    name="age"
                     type="number"
                     placeholder="35"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
@@ -353,10 +300,14 @@ function Emergency() {
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Gender</span>
-                  <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <select
+                    name="gender"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
                     <option value="">Select gender</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
+                    <option value="Other">Other</option>
                   </select>
                 </label>
               </div>
@@ -365,6 +316,7 @@ function Emergency() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Complaint</span>
                   <input
+                    name="complaint"
                     type="text"
                     placeholder="Primary complaint"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
@@ -373,6 +325,7 @@ function Emergency() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Room</span>
                   <input
+                    name="room"
                     type="text"
                     placeholder="Trauma 1 / Bay 07"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
@@ -383,15 +336,25 @@ function Emergency() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Assigned doctor</span>
-                  <input
-                    type="text"
-                    placeholder="Doctor name"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
-                  />
+                  <select
+                    name="doctor"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <option value="">Select doctor</option>
+                    {doctorOptions.map((doctor) => (
+                      <option key={doctor.id} value={doctor.name}>
+                        {doctor.name}{doctor.department ? ` - ${doctor.department}` : ''}
+                      </option>
+                    ))}
+                    <option value="Unassigned">Unassigned</option>
+                  </select>
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Severity</span>
-                  <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <select
+                    name="severity"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
                     <option value="">Select severity</option>
                     <option value="Critical">Critical</option>
                     <option value="Urgent">Urgent</option>
@@ -403,7 +366,10 @@ function Emergency() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Case status</span>
-                  <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <select
+                    name="status"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
                     <option value="">Select status</option>
                     <option value="Incoming">Incoming</option>
                     <option value="In treatment">In treatment</option>
@@ -414,6 +380,7 @@ function Emergency() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Arrival time</span>
                   <input
+                    name="arrival_time"
                     type="datetime-local"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                   />
@@ -423,6 +390,7 @@ function Emergency() {
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
                 <textarea
+                  name="notes"
                   rows={3}
                   placeholder="Additional notes"
                   className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"

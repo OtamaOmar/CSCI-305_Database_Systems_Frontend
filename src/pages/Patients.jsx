@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { Bell, Filter, HeartPulse, Moon, Pencil, Plus, Search, Sun, Trash2 } from 'lucide-react'
+import TopBar from '../components/TopBar'
+import { useAlert } from '../components/AlertProvider'
+import { Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 
 
 const levels = ['All', 'Critical', 'Urgent', 'Stable']
@@ -12,9 +13,11 @@ const levelStyles = {
 }
 
 function Patients() {
+  const { confirm, notify } = useAlert()
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState('All')
   const [patientRows, setPatientRows] = useState([])
+  const [doctorOptions, setDoctorOptions] = useState([])
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingPatient, setEditingPatient] = useState(null)
@@ -32,19 +35,38 @@ function Patients() {
   }, [isDark])
 
   async function fetchPatients() {
-    const response = await fetch('http://localhost:5000/api/patients')
-    const data = await response.json()
-    setPatientRows(data)
+    try {
+      const response = await fetch('http://localhost:5000/api/patients')
+      if (!response.ok) throw new Error('Failed to load patients.')
+      const data = await response.json()
+      setPatientRows(data)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  async function fetchDoctors() {
+    try {
+      const response = await fetch('http://localhost:5000/api/doctors')
+      if (!response.ok) throw new Error('Failed to load doctors.')
+      const data = await response.json()
+      setDoctorOptions(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error(err)
+      notify({ tone: 'error', message: err.message })
+    }
   }
 
   useEffect(() => {
     fetchPatients()
+    fetchDoctors()
   }, [])
 
   async function handleAddPatient(event) {
     event.preventDefault()
-    const formData = new FormData(event.currentTarget)
-    const id = String(formData.get('id') || '').trim() || `ED-${Date.now().toString().slice(-4)}`
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    const id = `ED-${Date.now().toString().slice(-6)}`
 
     const nextPatient = {
       id,
@@ -57,14 +79,19 @@ function Patients() {
       level: String(formData.get('level') || '').trim(),
     }
 
-    await fetch('http://localhost:5000/api/patients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(nextPatient),
-    })
-    await fetchPatients()
-    event.currentTarget.reset()
-    setIsAddOpen(false)
+    try {
+      const response = await fetch('http://localhost:5000/api/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextPatient),
+      })
+      if (!response.ok) throw new Error('Failed to add patient.')
+      await fetchPatients()
+      form.reset()
+      setIsAddOpen(false)
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
   }
 
   function openEditPatient(patient) {
@@ -100,7 +127,13 @@ function Patients() {
   }
 
   async function handleDeletePatient(patientId) {
-    const ok = window.confirm('Delete this patient record?')
+    const ok = await confirm({
+      title: 'Delete patient?',
+      message: 'Delete this patient record? This cannot be undone.',
+      tone: 'warning',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+    })
     if (!ok) return
 
     await fetch(`http://localhost:5000/api/patients/${patientId}`, { method: 'DELETE' })
@@ -119,83 +152,28 @@ function Patients() {
     })
   }, [query, level, patientRows])
 
+  const doctorNameOptions = useMemo(() => {
+    return doctorOptions.map((doctor) => ({
+      value: doctor.name,
+      label: `${doctor.name}${doctor.department ? ` - ${doctor.department}` : ''}`,
+    }))
+  }, [doctorOptions])
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-                <HeartPulse className="h-4 w-4" />
-              </div>
-              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                Pulse<span className="text-brand">ED</span>
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              <Link
-                to="/dashboard"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/patient"
-                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Patients
-              </Link>
-              <Link
-                to="/doctors"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Doctors
-              </Link>
-              <Link
-                to="/emergency"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Emergency
-              </Link>
-              <Link
-                to="/staff"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Staff
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDark((value) => !value)}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            <button
-              type="button"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
-
-            <div className="hidden items-center gap-2.5 sm:flex">
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                SA
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dr. Sara Ahmed</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">St. Mercy General</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <TopBar
+        navItems={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Patients', to: '/patient' },
+          { label: 'Doctors', to: '/doctors' },
+          { label: 'Emergency', to: '/emergency' },
+          { label: 'Staff', to: '/staff' },
+        ]}
+        activePath="/patient"
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((value) => !value)}
+        showNotifications
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -342,15 +320,6 @@ function Patients() {
             <form className="space-y-4" onSubmit={handleAddPatient}>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Patient ID</span>
-                  <input
-                    name="id"
-                    type="text"
-                    placeholder="ED-2842"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
-                  />
-                </label>
-                <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Full name</span>
                   <input
                     name="name"
@@ -360,6 +329,12 @@ function Patients() {
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
+                <div className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Patient ID</span>
+                  <div className="w-full rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Auto-generated on save
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -400,13 +375,16 @@ function Patients() {
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Assigned doctor</span>
-                  <input
+                  <select
                     name="doctor"
-                    type="text"
-                    placeholder="Doctor name"
                     required
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
-                  />
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <option value="">Select doctor</option>
+                    {doctorNameOptions.map((doctor) => (
+                      <option key={doctor.value} value={doctor.value}>{doctor.label}</option>
+                    ))}
+                  </select>
                 </label>
               </div>
 
@@ -538,13 +516,21 @@ function Patients() {
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Assigned doctor</span>
-                  <input
+                  <select
                     name="doctor"
-                    type="text"
                     defaultValue={editingPatient.doctor}
                     required
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                  />
+                  >
+                    {editingPatient.doctor
+                      && !doctorNameOptions.some((doctor) => doctor.value === editingPatient.doctor)
+                      && (
+                        <option value={editingPatient.doctor}>{editingPatient.doctor}</option>
+                      )}
+                    {doctorNameOptions.map((doctor) => (
+                      <option key={doctor.value} value={doctor.value}>{doctor.label}</option>
+                    ))}
+                  </select>
                 </label>
               </div>
 

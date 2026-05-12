@@ -2,9 +2,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AuthLayout } from "./AuthLayout";
 import AuthField from "./AuthField";
+import { useAlert } from "../components/AlertProvider";
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const { notify } = useAlert();
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
@@ -30,7 +32,7 @@ export default function SignupPage() {
       if (!res.ok) throw new Error(json.error || "Registration failed.");
       navigate({ to: "/login" });
     } catch (err) {
-      alert(err.message);
+      notify({ tone: "error", message: err.message });
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { AlertTriangle, Bell, CheckCircle2, Clock, HeartPulse, Info, Moon, ShieldCheck, Siren, Sun } from 'lucide-react'
+import TopBar from '../components/TopBar'
+import { AlertTriangle, Bell, CheckCircle2, Clock, Info, ShieldCheck, Siren } from 'lucide-react'
 
 const iconMap = { CheckCircle2, ShieldCheck, Info }
 
@@ -21,7 +21,6 @@ function Notifications() {
       || window.matchMedia('(prefers-color-scheme: dark)').matches
     )
   })
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   useEffect(() => {
     fetch('http://localhost:5000/api/notifications')
@@ -42,95 +41,19 @@ function Notifications() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-                <HeartPulse className="h-4 w-4" />
-              </div>
-              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                Pulse<span className="text-brand">ED</span>
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              <Link
-                to="/dashboard"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/charts"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Charts
-              </Link>
-              <Link
-                to="/notifications"
-                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Notifications
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDark((value) => !value)}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            <Link
-              to="/notifications"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              aria-label="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-            </Link>
-
-            <div className="relative hidden items-center gap-2.5 sm:flex">
-              <button
-                type="button"
-                onClick={() => setIsMenuOpen((value) => !value)}
-                className="flex items-center gap-2.5 rounded-xl px-2 py-1 transition hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  SA
-                </div>
-                <div className="leading-tight text-left">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dr. Sara Ahmed</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">St. Mercy General</p>
-                </div>
-              </button>
-
-              {isMenuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                  <Link
-                    to="/settings"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    Settings
-                  </Link>
-                  <Link
-                    to="/profile"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    Profile settings
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <TopBar
+        navItems={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Charts', to: '/charts' },
+          { label: 'Notifications', to: '/notifications' },
+        ]}
+        activePath="/notifications"
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((value) => !value)}
+        showNotifications
+        notificationsAsLink
+        showUserMenu
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6">

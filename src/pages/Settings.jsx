@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { Bell, Cog, HeartPulse, Moon, Sun, User } from 'lucide-react'
+import TopBar from '../components/TopBar'
+import { useAlert } from '../components/AlertProvider'
+import { Cog, User } from 'lucide-react'
 
 function Settings() {
+  const { notify } = useAlert()
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -11,7 +13,28 @@ function Settings() {
       || window.matchMedia('(prefers-color-scheme: dark)').matches
     )
   })
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [currentUser] = useState(() => {
+    if (typeof window === 'undefined') return null
+
+    try {
+      const storedUser = localStorage.getItem('user')
+      return storedUser ? JSON.parse(storedUser) : null
+    } catch {
+      return null
+    }
+  })
+
+  const displayName = currentUser
+    ? [currentUser.first_name, currentUser.last_name].filter(Boolean).join(' ') || currentUser.email
+    : ''
+  const roleLabelMap = {
+    admin: 'Administrator',
+    doctor: 'Doctor',
+    nurse: 'Nurse',
+    staff: 'Staff',
+  }
+  const roleLabel = currentUser?.role ? roleLabelMap[currentUser.role] || currentUser.role : ''
+  const departmentLabel = currentUser?.hospital || ''
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
@@ -19,94 +42,23 @@ function Settings() {
 
   function handleSubmit(event) {
     event.preventDefault()
-    window.alert('Settings saved successfully.')
+    notify({ tone: 'success', message: 'Settings saved successfully.' })
   }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-                <HeartPulse className="h-4 w-4" />
-              </div>
-              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                Pulse<span className="text-brand">ED</span>
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              <Link
-                to="/dashboard"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/settings"
-                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Settings
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDark((value) => !value)}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            <Link
-              to="/notifications"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              aria-label="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-            </Link>
-
-            <div className="relative hidden items-center gap-2.5 sm:flex">
-              <button
-                type="button"
-                onClick={() => setIsMenuOpen((value) => !value)}
-                className="flex items-center gap-2.5 rounded-xl px-2 py-1 transition hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  SA
-                </div>
-                <div className="leading-tight text-left">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dr. Sara Ahmed</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">St. Mercy General</p>
-                </div>
-              </button>
-
-              {isMenuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                  <Link
-                    to="/settings"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    Settings
-                  </Link>
-                  <Link
-                    to="/profile"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    Profile settings
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <TopBar
+        navItems={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Settings', to: '/settings' },
+        ]}
+        activePath="/settings"
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((value) => !value)}
+        showNotifications
+        notificationsAsLink
+        showUserMenu
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6">
@@ -131,7 +83,7 @@ function Settings() {
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Full name</span>
                 <input
                   type="text"
-                  defaultValue="Dr. Sara Ahmed"
+                  defaultValue={displayName}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 />
               </label>
@@ -139,14 +91,20 @@ function Settings() {
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Work email</span>
                 <input
                   type="email"
-                  defaultValue="sara.ahmed@stmercy.org"
+                  defaultValue={currentUser?.email || ''}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 />
               </label>
               <label className="space-y-1.5">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</span>
-                <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                  <option>Emergency Lead</option>
+                <select
+                  defaultValue={roleLabel || undefined}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  {roleLabel && !['Administrator', 'Doctor', 'Nurse', 'Staff'].includes(roleLabel) && (
+                    <option>{roleLabel}</option>
+                  )}
+                  <option>Staff</option>
                   <option>Doctor</option>
                   <option>Nurse</option>
                   <option>Administrator</option>
@@ -154,7 +112,13 @@ function Settings() {
               </label>
               <label className="space-y-1.5">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Department</span>
-                <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                <select
+                  defaultValue={departmentLabel || undefined}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  {departmentLabel && !['Emergency', 'ICU', 'Surgery', 'Pediatrics'].includes(departmentLabel) && (
+                    <option>{departmentLabel}</option>
+                  )}
                   <option>Emergency</option>
                   <option>ICU</option>
                   <option>Surgery</option>

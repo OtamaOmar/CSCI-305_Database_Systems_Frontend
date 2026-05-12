@@ -1,45 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { Bell, Filter, HeartPulse, Moon, Pencil, Plus, Search, Sun, Trash2 } from 'lucide-react'
-
-const doctors = [
-  {
-    id: 'DR-1001',
-    name: 'Dr. Sara Ahmed',
-    email: 'sara.ahmed@stmercy.org',
-    specialty: 'Emergency Medicine',
-    department: 'Emergency',
-    shift: 'Morning',
-    status: 'On duty',
-  },
-  {
-    id: 'DR-1002',
-    name: 'Dr. Karim Nasser',
-    email: 'karim.nasser@stmercy.org',
-    specialty: 'Trauma Surgery',
-    department: 'Surgery',
-    shift: 'Morning',
-    status: 'On duty',
-  },
-  {
-    id: 'DR-1003',
-    name: 'Dr. Mei Chen',
-    email: 'mei.chen@stmercy.org',
-    specialty: 'Pediatrics',
-    department: 'Pediatric ED',
-    shift: 'Evening',
-    status: 'On call',
-  },
-  {
-    id: 'DR-1004',
-    name: 'Dr. Tom Becker',
-    email: 'tom.becker@stmercy.org',
-    specialty: 'Pulmonology',
-    department: 'Internal Medicine',
-    shift: 'Night',
-    status: 'Off duty',
-  },
-]
+import TopBar from '../components/TopBar'
+import { useAlert } from '../components/AlertProvider'
+import { Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 
 const statusFilters = ['All', 'On duty', 'On call', 'Off duty']
 
@@ -50,9 +12,10 @@ const statusStyles = {
 }
 
 function Doctors() {
+  const { confirm, notify } = useAlert()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All')
-  const [doctorRows, setDoctorRows] = useState(doctors)
+  const [doctorRows, setDoctorRows] = useState([])
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState(null)
@@ -69,10 +32,26 @@ function Doctors() {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
-  function handleAddDoctor(event) {
+  async function fetchDoctors() {
+    try {
+      const response = await fetch('http://localhost:5000/api/doctors')
+      if (!response.ok) throw new Error('Failed to load doctors.')
+      const data = await response.json()
+      setDoctorRows(data)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  useEffect(() => {
+    fetchDoctors()
+  }, [])
+
+  async function handleAddDoctor(event) {
     event.preventDefault()
-    const formData = new FormData(event.currentTarget)
-    const id = String(formData.get('id') || '').trim() || `DR-${Date.now().toString().slice(-4)}`
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    const id = `DR-${Date.now().toString().slice(-6)}`
 
     const nextDoctor = {
       id,
@@ -82,11 +61,23 @@ function Doctors() {
       department: String(formData.get('department') || '').trim(),
       shift: String(formData.get('shift') || '').trim(),
       status: String(formData.get('status') || '').trim(),
+      phone: String(formData.get('phone') || '').trim(),
+      notes: String(formData.get('notes') || '').trim(),
     }
 
-    setDoctorRows((prev) => [nextDoctor, ...prev])
-    event.currentTarget.reset()
-    setIsAddOpen(false)
+    try {
+      const response = await fetch('http://localhost:5000/api/doctors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextDoctor),
+      })
+      if (!response.ok) throw new Error('Failed to add doctor.')
+      await fetchDoctors()
+      form.reset()
+      setIsAddOpen(false)
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
   }
 
   function openEditDoctor(doctor) {
@@ -94,7 +85,7 @@ function Doctors() {
     setIsEditOpen(true)
   }
 
-  function handleEditDoctor(event) {
+  async function handleEditDoctor(event) {
     event.preventDefault()
 
     if (!editingDoctor) return
@@ -110,26 +101,48 @@ function Doctors() {
       status: String(formData.get('status') || '').trim(),
     }
 
-    setDoctorRows((prev) => prev.map((item) => (item.id === editingDoctor.id ? updatedDoctor : item)))
-    setIsEditOpen(false)
-    setEditingDoctor(null)
+    try {
+      const response = await fetch(`http://localhost:5000/api/doctors/${editingDoctor.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedDoctor),
+      })
+      if (!response.ok) throw new Error('Failed to update doctor.')
+      await fetchDoctors()
+      setIsEditOpen(false)
+      setEditingDoctor(null)
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
   }
 
-  function handleDeleteDoctor(doctorId) {
-    const ok = window.confirm('Delete this doctor record?')
+  async function handleDeleteDoctor(doctorId) {
+    const ok = await confirm({
+      title: 'Delete doctor?',
+      message: 'Delete this doctor record? This cannot be undone.',
+      tone: 'warning',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+    })
     if (!ok) return
 
-    setDoctorRows((prev) => prev.filter((item) => item.id !== doctorId))
+    try {
+      const response = await fetch(`http://localhost:5000/api/doctors/${doctorId}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Failed to delete doctor.')
+      await fetchDoctors()
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
   }
 
   const filtered = useMemo(() => {
     return doctorRows.filter((doctor) => {
       const lowered = query.toLowerCase()
       const matchQuery = !query
-        || doctor.name.toLowerCase().includes(lowered)
-        || doctor.id.toLowerCase().includes(lowered)
-        || doctor.specialty.toLowerCase().includes(lowered)
-        || doctor.department.toLowerCase().includes(lowered)
+        || (doctor.name || '').toLowerCase().includes(lowered)
+        || (doctor.id || '').toLowerCase().includes(lowered)
+        || (doctor.specialty || '').toLowerCase().includes(lowered)
+        || (doctor.department || '').toLowerCase().includes(lowered)
       const matchStatus = status === 'All' || doctor.status === status
       return matchQuery && matchStatus
     })
@@ -137,81 +150,19 @@ function Doctors() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-                <HeartPulse className="h-4 w-4" />
-              </div>
-              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                Pulse<span className="text-brand">ED</span>
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              <Link
-                to="/dashboard"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/patient"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Patients
-              </Link>
-              <button
-                type="button"
-                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Doctors
-              </button>
-              <Link
-                to="/emergency"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Emergency
-              </Link>
-              <Link
-                to="/staff"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Staff
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDark((value) => !value)}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            <button
-              type="button"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
-
-            <div className="hidden items-center gap-2.5 sm:flex">
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                SA
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Dr. Sara Ahmed</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">St. Mercy General</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <TopBar
+        navItems={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Patients', to: '/patient' },
+          { label: 'Doctors', to: '/doctors' },
+          { label: 'Emergency', to: '/emergency' },
+          { label: 'Staff', to: '/staff' },
+        ]}
+        activePath="/doctors"
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((value) => !value)}
+        showNotifications
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -358,15 +309,6 @@ function Doctors() {
             <form className="space-y-4" onSubmit={handleAddDoctor}>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Doctor ID</span>
-                  <input
-                    name="id"
-                    type="text"
-                    placeholder="DR-1005"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
-                  />
-                </label>
-                <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Full name</span>
                   <input
                     name="name"
@@ -376,6 +318,12 @@ function Doctors() {
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
                   />
                 </label>
+                <div className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Doctor ID</span>
+                  <div className="w-full rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Auto-generated on save
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -392,6 +340,7 @@ function Doctors() {
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Phone</span>
                   <input
+                    name="phone"
                     type="tel"
                     placeholder="+1 555 000 0000"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
@@ -454,6 +403,7 @@ function Doctors() {
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
                 <textarea
+                  name="notes"
                   rows={3}
                   placeholder="Additional notes"
                   className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"

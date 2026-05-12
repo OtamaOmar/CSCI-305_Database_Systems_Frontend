@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { BarChart3, Bell, HeartPulse, Moon, Sun } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import TopBar from '../components/TopBar'
+import { useAlert } from '../components/AlertProvider'
+import { BarChart3 } from 'lucide-react'
 import {
   ResponsiveContainer,
   PieChart,
@@ -18,47 +19,17 @@ import {
   Area,
 } from 'recharts'
 
-const roomData = [
-  { name: 'Occupied', value: 54 },
-  { name: 'Available', value: 26 },
-]
-
-const staffData = [
-  { department: 'Emergency', staff: 18 },
-  { department: 'Surgery', staff: 14 },
-  { department: 'ICU', staff: 12 },
-  { department: 'Pediatrics', staff: 9 },
-  { department: 'Radiology', staff: 7 },
-]
-
-const patientData = [
-  { month: 'Jan', patients: 1180 },
-  { month: 'Feb', patients: 1225 },
-  { month: 'Mar', patients: 1310 },
-  { month: 'Apr', patients: 1288 },
-  { month: 'May', patients: 1365 },
-  { month: 'Jun', patients: 1420 },
-]
-
-const appointmentData = [
-  { day: 'Mon', booked: 52, completed: 46 },
-  { day: 'Tue', booked: 57, completed: 50 },
-  { day: 'Wed', booked: 61, completed: 55 },
-  { day: 'Thu', booked: 54, completed: 47 },
-  { day: 'Fri', booked: 66, completed: 59 },
-  { day: 'Sat', booked: 39, completed: 31 },
-  { day: 'Sun', booked: 28, completed: 22 },
-]
-
-const emergencyData = [
-  { level: 'Critical', cases: 18 },
-  { level: 'Urgent', cases: 34 },
-  { level: 'Moderate', cases: 27 },
-  { level: 'Stable', cases: 16 },
-]
-
 const roomColors = ['#ef4444', '#22c55e']
 const emergencyColors = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e']
+const ROOM_CAPACITY = 80
+const CHART_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function parseDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date
+}
 
 function ChartCard({ title, subtitle, children }) {
   return (
@@ -71,6 +42,7 @@ function ChartCard({ title, subtitle, children }) {
 }
 
 function Charts() {
+  const { notify } = useAlert()
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -80,59 +52,179 @@ function Charts() {
     )
   })
 
+  const [cases, setCases] = useState([])
+  const [doctors, setDoctors] = useState([])
+  const [patients, setPatients] = useState([])
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchList = async (url, label) => {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`${label} request failed.`)
+      const data = await response.json()
+      return Array.isArray(data) ? data : []
+    }
+
+    const loadCharts = async () => {
+      const [casesResult, doctorsResult, patientsResult] = await Promise.allSettled([
+        fetchList('http://localhost:5000/api/cases', 'Cases'),
+        fetchList('http://localhost:5000/api/doctors', 'Doctors'),
+        fetchList('http://localhost:5000/api/patients', 'Patients'),
+      ])
+
+      if (!isMounted) return
+
+      if (casesResult.status === 'fulfilled') {
+        setCases(casesResult.value)
+      } else {
+        console.error(casesResult.reason)
+        notify({ tone: 'error', message: 'Failed to load emergency cases for charts.' })
+      }
+
+      if (doctorsResult.status === 'fulfilled') {
+        setDoctors(doctorsResult.value)
+      } else {
+        console.error(doctorsResult.reason)
+        notify({ tone: 'error', message: 'Failed to load doctors for charts.' })
+      }
+
+      if (patientsResult.status === 'fulfilled') {
+        setPatients(patientsResult.value)
+      } else {
+        console.error(patientsResult.reason)
+        notify({ tone: 'error', message: 'Failed to load patients for charts.' })
+      }
+    }
+
+    loadCharts()
+
+    return () => {
+      isMounted = false
+    }
+  }, [notify])
+
+  const roomData = useMemo(() => {
+    const occupied = Math.min(patients.length, ROOM_CAPACITY)
+    const available = Math.max(ROOM_CAPACITY - occupied, 0)
+    return [
+      { name: 'Occupied', value: occupied },
+      { name: 'Available', value: available },
+    ]
+  }, [patients])
+
+  const staffData = useMemo(() => {
+    const counts = doctors.reduce((acc, doctor) => {
+      const department = doctor.department || 'Unassigned'
+      acc[department] = (acc[department] || 0) + 1
+      return acc
+    }, {})
+
+    return Object.entries(counts)
+      .map(([department, staff]) => ({ department, staff }))
+      .sort((a, b) => b.staff - a.staff)
+      .slice(0, 6)
+  }, [doctors])
+
+  const patientData = useMemo(() => {
+    const now = new Date()
+    const buckets = []
+
+    for (let i = 5; i >= 0; i -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = `${date.getFullYear()}-${date.getMonth()}`
+      buckets.push({
+        key,
+        month: date.toLocaleString('en-US', { month: 'short' }),
+        patients: 0,
+      })
+    }
+
+    const indexByKey = buckets.reduce((acc, item, index) => {
+      acc[item.key] = index
+      return acc
+    }, {})
+
+    patients.forEach((patient) => {
+      const date = parseDate(patient.created_at)
+      if (!date) return
+      const key = `${date.getFullYear()}-${date.getMonth()}`
+      const index = indexByKey[key]
+      if (index !== undefined) {
+        buckets[index].patients += 1
+      }
+    })
+
+    return buckets
+  }, [patients])
+
+  const appointmentData = useMemo(() => {
+    const now = new Date()
+    const days = []
+
+    for (let i = 6; i >= 0; i -= 1) {
+      const date = new Date(now)
+      date.setDate(now.getDate() - i)
+      const dayIndex = date.getDay()
+      const label = CHART_DAYS[(dayIndex + 6) % 7]
+      days.push({
+        key: date.toDateString(),
+        day: label,
+        booked: 0,
+        completed: 0,
+      })
+    }
+
+    const indexByKey = days.reduce((acc, item, index) => {
+      acc[item.key] = index
+      return acc
+    }, {})
+
+    cases.forEach((item) => {
+      const date = parseDate(item.created_at || item.arrival_time)
+      if (!date) return
+      const key = date.toDateString()
+      const index = indexByKey[key]
+      if (index === undefined) return
+      days[index].booked += 1
+      if (item.status === 'Discharged') {
+        days[index].completed += 1
+      }
+    })
+
+    return days
+  }, [cases])
+
+  const emergencyData = useMemo(() => {
+    const levels = ['Critical', 'Urgent', 'Stable']
+    const counts = cases.reduce((acc, item) => {
+      if (!item.severity) return acc
+      acc[item.severity] = (acc[item.severity] || 0) + 1
+      return acc
+    }, {})
+
+    return levels.map((level) => ({
+      level,
+      cases: counts[level] || 0,
+    }))
+  }, [cases])
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
-                <HeartPulse className="h-4 w-4" />
-              </div>
-              <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                Pulse<span className="text-brand">ED</span>
-              </p>
-            </div>
-
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              <Link
-                to="/dashboard"
-                className="rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/charts"
-                className="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Charts
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDark((value) => !value)}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            <button
-              type="button"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </header>
+      <TopBar
+        navItems={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Charts', to: '/charts' },
+        ]}
+        activePath="/charts"
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((value) => !value)}
+        showNotifications
+      />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6">
