@@ -2,58 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Bell, Filter, HeartPulse, Moon, Pencil, Plus, Search, Sun, Trash2 } from 'lucide-react'
 
-const patients = [
-  {
-    id: 'ED-2841',
-    name: 'Adan Khalid',
-    age: 42,
-    gender: 'Male',
-    condition: 'Acute chest pain',
-    doctor: 'Dr. Sara Ahmed',
-    bay: 'Bay 03',
-    level: 'Critical',
-  },
-  {
-    id: 'ED-2840',
-    name: 'Maria Lopez',
-    age: 28,
-    gender: 'Female',
-    condition: 'Closed tibia fracture',
-    doctor: 'Dr. Karim Nasser',
-    bay: 'Bay 07',
-    level: 'Urgent',
-  },
-  {
-    id: 'ED-2839',
-    name: 'Yuki Tanaka',
-    age: 8,
-    gender: 'Male',
-    condition: 'High fever, suspected viral',
-    doctor: 'Dr. Mei Chen',
-    bay: 'Bay 12',
-    level: 'Stable',
-  },
-  {
-    id: 'ED-2838',
-    name: 'Omar Said',
-    age: 51,
-    gender: 'Male',
-    condition: 'Multi-trauma (RTA)',
-    doctor: 'Dr. Karim Nasser',
-    bay: 'Bay 01',
-    level: 'Critical',
-  },
-  {
-    id: 'ED-2837',
-    name: 'Lina Park',
-    age: 34,
-    gender: 'Female',
-    condition: 'Severe asthma exacerbation',
-    doctor: 'Dr. Tom Becker',
-    bay: 'Bay 09',
-    level: 'Urgent',
-  },
-]
 
 const levels = ['All', 'Critical', 'Urgent', 'Stable']
 
@@ -66,7 +14,7 @@ const levelStyles = {
 function Patients() {
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState('All')
-  const [patientRows, setPatientRows] = useState(patients)
+  const [patientRows, setPatientRows] = useState([])
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingPatient, setEditingPatient] = useState(null)
@@ -83,7 +31,17 @@ function Patients() {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
-  function handleAddPatient(event) {
+  async function fetchPatients() {
+    const response = await fetch('http://localhost:5000/api/patients')
+    const data = await response.json()
+    setPatientRows(data)
+  }
+
+  useEffect(() => {
+    fetchPatients()
+  }, [])
+
+  async function handleAddPatient(event) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
     const id = String(formData.get('id') || '').trim() || `ED-${Date.now().toString().slice(-4)}`
@@ -99,7 +57,12 @@ function Patients() {
       level: String(formData.get('level') || '').trim(),
     }
 
-    setPatientRows((prev) => [nextPatient, ...prev])
+    await fetch('http://localhost:5000/api/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nextPatient),
+    })
+    await fetchPatients()
     event.currentTarget.reset()
     setIsAddOpen(false)
   }
@@ -109,7 +72,7 @@ function Patients() {
     setIsEditOpen(true)
   }
 
-  function handleEditPatient(event) {
+  async function handleEditPatient(event) {
     event.preventDefault()
 
     if (!editingPatient) return
@@ -126,16 +89,22 @@ function Patients() {
       level: String(formData.get('level') || '').trim(),
     }
 
-    setPatientRows((prev) => prev.map((item) => (item.id === editingPatient.id ? updatedPatient : item)))
+    await fetch(`http://localhost:5000/api/patients/${editingPatient.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedPatient),
+    })
+    await fetchPatients()
     setIsEditOpen(false)
     setEditingPatient(null)
   }
 
-  function handleDeletePatient(patientId) {
+  async function handleDeletePatient(patientId) {
     const ok = window.confirm('Delete this patient record?')
     if (!ok) return
 
-    setPatientRows((prev) => prev.filter((item) => item.id !== patientId))
+    await fetch(`http://localhost:5000/api/patients/${patientId}`, { method: 'DELETE' })
+    await fetchPatients()
   }
 
   const filtered = useMemo(() => {
