@@ -1,26 +1,84 @@
 import { Link } from '@tanstack/react-router'
 import { Bell, Contact, HeartPulse, Moon, Sun } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
 const defaultNavItems = [
   { label: 'Dashboard', to: '/dashboard' },
   { label: 'Patients', to: '/patient' },
   { label: 'Doctors', to: '/doctors' },
   { label: 'Emergency', to: '/emergency' },
-  { label: 'Hospital Operations', to: '/hospital-operations' },
+  { label: 'Staff', to: '/staff' },
 ]
+
+const hospitalFeatureNavItems = [
+  { label: 'Appointments', to: '/appointments' },
+  { label: 'Emergency Ops', to: '/emergency-operations' },
+  { label: 'Reports', to: '/reports-dashboard' },
+  { label: 'Rooms', to: '/rooms-management' },
+  { label: 'Departments', to: '/departments-page' },
+  { label: 'Locations', to: '/hospital-locations' },
+  { label: 'Prescriptions', to: '/prescriptions' },
+  { label: 'Files', to: '/medical-files' },
+  { label: 'Admin', to: '/admin-panel' },
+]
+
+function mergeNavItems(items = []) {
+  const merged = new Map()
+
+  ;[...items, ...hospitalFeatureNavItems].forEach((item) => {
+    if (!merged.has(item.to)) {
+      merged.set(item.to, item)
+    }
+  })
+
+  return Array.from(merged.values())
+}
 
 function TopBar({
   navItems = defaultNavItems,
   activePath = typeof window !== 'undefined' ? window.location.pathname : '',
-  isDark = false,
+  isDark,
   onToggleTheme,
   showContact = false,
   showNotifications = true,
   notificationsAsLink = false,
   showUserMenu = false,
   heightClass = 'h-16',
-})  {
+}) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  const [internalIsDark, setInternalIsDark] = useState(() => {
+    if (typeof window === 'undefined') return false
+
+    const savedTheme = localStorage.getItem('theme')
+
+    if (savedTheme === 'dark') return true
+    if (savedTheme === 'light') return false
+
+    return (
+      document.documentElement.classList.contains('dark') ||
+      window.matchMedia('(prefers-color-scheme: dark)').matches
+    )
+  })
+
+  const currentIsDark = typeof isDark === 'boolean' ? isDark : internalIsDark
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    document.documentElement.classList.toggle('dark', currentIsDark)
+    localStorage.setItem('theme', currentIsDark ? 'dark' : 'light')
+  }, [currentIsDark])
+
+  function handleThemeToggle() {
+    if (onToggleTheme) {
+      onToggleTheme()
+      return
+    }
+
+    setInternalIsDark((value) => !value)
+  }
+
   const [currentUser] = useState(() => {
     if (typeof window === 'undefined') return null
 
@@ -35,7 +93,9 @@ function TopBar({
   const displayName = currentUser
     ? [currentUser.first_name, currentUser.last_name].filter(Boolean).join(' ') || currentUser.email
     : 'Signed in user'
+
   const displayMeta = currentUser?.hospital || currentUser?.role || 'PulseED'
+
   const displayInitials = currentUser
     ? [currentUser.first_name, currentUser.last_name]
         .filter(Boolean)
@@ -44,23 +104,27 @@ function TopBar({
         .toUpperCase() || currentUser.email?.charAt(0)?.toUpperCase() || 'U'
     : 'U'
 
+  const visibleNavItems = mergeNavItems(navItems)
+
   return (
     <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
       <div className={`mx-auto flex ${heightClass} w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-6">
+          <div className="flex shrink-0 items-center gap-3">
             <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white dark:bg-slate-50 dark:text-slate-950">
               <HeartPulse className="h-4 w-4" />
             </div>
+
             <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
               Pulse<span className="text-brand">ED</span>
             </p>
           </div>
 
-          {navItems.length > 0 && (
-            <nav className="hidden items-center gap-2 text-sm md:flex">
-              {navItems.map((item) => {
+          {visibleNavItems.length > 0 && (
+            <nav className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap text-sm md:flex">
+              {visibleNavItems.map((item) => {
                 const isActive = item.isActive ?? item.to === activePath
+
                 const className = isActive
                   ? 'rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200'
                   : 'rounded-xl px-4 py-2 font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
@@ -75,14 +139,14 @@ function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={onToggleTheme}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={handleThemeToggle}
+            aria-label={currentIsDark ? 'Switch to light mode' : 'Switch to dark mode'}
             className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {currentIsDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
 
           {showContact && (
@@ -95,8 +159,8 @@ function TopBar({
             </Link>
           )}
 
-          {showNotifications
-            && (notificationsAsLink ? (
+          {showNotifications &&
+            (notificationsAsLink ? (
               <Link
                 to="/notifications"
                 className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -124,9 +188,14 @@ function TopBar({
                 <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   {displayInitials}
                 </div>
+
                 <div className="leading-tight text-left">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{displayName}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{displayMeta}</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                    {displayName}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {displayMeta}
+                  </p>
                 </div>
               </button>
 
@@ -139,6 +208,7 @@ function TopBar({
                   >
                     Settings
                   </Link>
+
                   <Link
                     to="/profile"
                     onClick={() => setIsMenuOpen(false)}
