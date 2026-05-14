@@ -1,10 +1,17 @@
 import { Link } from '@tanstack/react-router'
 import { Bell, Contact, HeartPulse, Moon, Sun } from 'lucide-react'
 import { useState } from 'react'
+const defaultNavItems = [
+  { label: 'Dashboard', to: '/dashboard' },
+  { label: 'Patients', to: '/patient' },
+  { label: 'Doctors', to: '/doctors' },
+  { label: 'Emergency', to: '/emergency' },
+  { label: 'Hospital Operations', to: '/hospital-operations' },
+]
 
 function TopBar({
-  navItems = [],
-  activePath = '',
+  navItems = defaultNavItems,
+  activePath = typeof window !== 'undefined' ? window.location.pathname : '',
   isDark = false,
   onToggleTheme,
   showContact = false,
@@ -12,7 +19,7 @@ function TopBar({
   notificationsAsLink = false,
   showUserMenu = false,
   heightClass = 'h-16',
-}) {
+})  {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentUser] = useState(() => {
     if (typeof window === 'undefined') return null

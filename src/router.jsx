@@ -10,6 +10,7 @@ import Profile from './pages/Profile'
 import Patients from './pages/Patients'
 import Doctors from './pages/Doctors'
 import Emergency from './pages/Emergency'
+import HospitalOperations from './pages/HospitalOperations'
 import LoginPage from './auth/Login'
 import SignupPage from './auth/Signup'
 
@@ -57,6 +58,11 @@ const emergencyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/emergency',
   component: Emergency,
+})
+const hospitalOperationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/hospital-operations',
+  component: HospitalOperations,
 })
 
 const signupRoute = createRoute({
@@ -109,6 +115,7 @@ const routeTree = rootRoute.addChildren([
   patientRoute,
   doctorsRoute,
   emergencyRoute,
+  hospitalOperationsRoute,
 ])
 
 export const router = createRouter({ routeTree })
