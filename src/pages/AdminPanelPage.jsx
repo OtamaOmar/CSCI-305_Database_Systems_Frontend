@@ -1,10 +1,10 @@
-import { ShieldCheck, Users, UserCog } from 'lucide-react'
+import { Pencil, ShieldCheck, UserMinus, UserCog, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
 import useAlert from '../hooks/useAlert'
 import { getStatusClass } from './hospitalData'
 import { createInvitation, getInvitations, getRoles, getUsers, revokeInvitation } from './hospitalApi'
-import { getUser } from '../lib/api'
+import { apiFetch, getUser } from '../lib/api'
 import { hasPermission } from '../lib/rbac'
 
 function Badge({ value }) {
@@ -24,6 +24,8 @@ export default function AdminPanelPage() {
   const [roles, setRoles] = useState([])
   const [invitations, setInvitations] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [editingUser, setEditingUser] = useState(null)
+  const [editRole, setEditRole] = useState('')
 
   async function loadData() {
     setIsLoading(true)
@@ -79,6 +81,48 @@ export default function AdminPanelPage() {
 
     try {
       await revokeInvitation(invite.id)
+      await loadData()
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
+  }
+
+  function openEditRole(user) {
+    setEditRole(user.role)
+    setEditingUser(user)
+  }
+
+  async function handleChangeRole(event) {
+    event.preventDefault()
+    try {
+      await apiFetch(`/api/users/${editingUser.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role: editRole }),
+      })
+      notify({ tone: 'success', message: `Role updated to "${editRole}".` })
+      setEditingUser(null)
+      await loadData()
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
+  }
+
+  async function handleDeactivate(user) {
+    const ok = await confirm({
+      title: 'Deactivate account?',
+      message: `Deactivate ${[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email}? They will no longer be able to log in.`,
+      tone: 'warning',
+      confirmText: 'Deactivate',
+      cancelText: 'Cancel',
+    })
+    if (!ok) return
+
+    try {
+      await apiFetch(`/api/users/${user.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: 0 }),
+      })
+      notify({ tone: 'success', message: 'Account deactivated.' })
       await loadData()
     } catch (err) {
       notify({ tone: 'error', message: err.message })
@@ -170,32 +214,67 @@ export default function AdminPanelPage() {
                     <th className="px-5 py-3">Role</th>
                     <th className="px-5 py-3">Access</th>
                     <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3" />
                   </tr>
                 </thead>
 
                 <tbody>
                   {isLoading && (
                     <tr className="border-t border-slate-100 dark:border-slate-800">
-                      <td colSpan={5} className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                      <td colSpan={6} className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
                         Loading users…
                       </td>
                     </tr>
                   )}
 
-                  {users.map((user) => (
-                    <tr
-                      key={user.id}
-                      className="border-t border-slate-100 dark:border-slate-800 dark:text-slate-200"
-                    >
-                      <td className="px-5 py-4 font-semibold">{user.id}</td>
-                      <td className="px-5 py-4">{[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email}</td>
-                      <td className="px-5 py-4">{user.role}</td>
-                      <td className="px-5 py-4">Hospital scoped</td>
-                      <td className="px-5 py-4">
-                        <Badge value={user.is_active ? 'Active' : 'Disabled'} />
-                      </td>
-                    </tr>
-                  ))}
+                  {users.map((user) => {
+                    const isOwner = user.role === 'owner'
+                    return (
+                      <tr
+                        key={user.id}
+                        className="border-t border-slate-100 dark:border-slate-800 dark:text-slate-200"
+                      >
+                        <td className="px-5 py-4 font-semibold">{user.id}</td>
+                        <td className="px-5 py-4">{[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email}</td>
+                        <td className="px-5 py-4">{user.role}</td>
+                        <td className="px-5 py-4">Hospital scoped</td>
+                        <td className="px-5 py-4">
+                          <Badge value={user.is_active ? 'Active' : 'Disabled'} />
+                        </td>
+                        <td className="px-5 py-4">
+                          {!isOwner && (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEditRole(user)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit role
+                              </button>
+                              {user.is_active ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeactivate(user)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60"
+                                >
+                                  <UserMinus className="h-3.5 w-3.5" />
+                                  Deactivate
+                                </button>
+                              ) : (
+                                <span className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-400 dark:border-slate-700">
+                                  Inactive
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {isOwner && (
+                            <span className="text-xs text-slate-400 dark:text-slate-500">Owner</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -319,6 +398,59 @@ export default function AdminPanelPage() {
           </section>
         </div>
       </main>
+
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm dark:bg-slate-950/70">
+          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Edit role</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  {[editingUser.first_name, editingUser.last_name].filter(Boolean).join(' ') || editingUser.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+
+            <form className="space-y-4" onSubmit={handleChangeRole}>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</span>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="doctor">Doctor</option>
+                  <option value="nurse">Nurse</option>
+                </select>
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90"
+                >
+                  Save role
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

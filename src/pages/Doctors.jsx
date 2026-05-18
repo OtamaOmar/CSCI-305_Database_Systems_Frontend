@@ -124,6 +124,8 @@ function Doctors() {
       department: String(formData.get('department') || '').trim(),
       shift: String(formData.get('shift') || '').trim(),
       status: String(formData.get('status') || '').trim(),
+      phone: String(formData.get('phone') || '').trim() || null,
+      notes: String(formData.get('notes') || '').trim() || null,
     }
 
     try {
@@ -566,7 +568,28 @@ function Doctors() {
                     <option value="Off duty">Off duty</option>
                   </select>
                 </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Phone</span>
+                  <input
+                    name="phone"
+                    type="tel"
+                    defaultValue={editingDoctor.phone || ''}
+                    placeholder="+1 555 000 0000"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  />
+                </label>
               </div>
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
+                <textarea
+                  name="notes"
+                  rows={3}
+                  defaultValue={editingDoctor.notes || ''}
+                  placeholder="Additional notes"
+                  className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
+                />
+              </label>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button

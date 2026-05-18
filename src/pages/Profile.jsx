@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
 import useAlert from '../hooks/useAlert'
+import { apiFetch } from '../lib/api'
 import { Lock, Mail, User } from 'lucide-react'
 
 function Profile() {
@@ -13,6 +14,7 @@ function Profile() {
       || window.matchMedia('(prefers-color-scheme: dark)').matches
     )
   })
+  const [isSaving, setIsSaving] = useState(false)
   const [currentUser] = useState(() => {
     if (typeof window === 'undefined') return null
 
@@ -41,9 +43,26 @@ function Profile() {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-    notify({ tone: 'success', message: 'Profile updated successfully.' })
+    const data = new FormData(event.currentTarget)
+    const fullName = (data.get('fullName') || '').trim()
+    const spaceIdx = fullName.indexOf(' ')
+    const first_name = spaceIdx === -1 ? fullName : fullName.slice(0, spaceIdx)
+    const last_name = spaceIdx === -1 ? '' : fullName.slice(spaceIdx + 1)
+
+    setIsSaving(true)
+    try {
+      await apiFetch(`/api/users/${currentUser?.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ first_name, last_name }),
+      })
+      notify({ tone: 'success', message: 'Profile updated successfully.' })
+    } catch (err) {
+      notify({ tone: 'error', title: 'Save failed', message: err.message || 'Could not update profile.' })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -81,6 +100,7 @@ function Profile() {
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Full name</span>
                 <input
                   type="text"
+                  name="fullName"
                   defaultValue={displayName}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 />
@@ -182,9 +202,10 @@ function Profile() {
           <div className="flex justify-end">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand/90"
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Save profile
+              {isSaving ? 'Saving…' : 'Save profile'}
             </button>
           </div>
         </form>

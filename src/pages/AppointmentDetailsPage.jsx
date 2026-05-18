@@ -194,6 +194,7 @@ export default function AppointmentDetailsPage() {
                 <input
                   name="time"
                   type="time"
+                  defaultValue={appointment.time}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                 />
               </div>

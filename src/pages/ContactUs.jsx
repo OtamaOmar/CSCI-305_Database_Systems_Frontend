@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import useAlert from '../hooks/useAlert'
+import { apiFetch } from '../lib/api'
 import { Headset, Hospital, Mail, MapPin, Phone, Send, Sun, Moon } from 'lucide-react'
 
 function ContactUs() {
@@ -13,6 +14,7 @@ function ContactUs() {
       || window.matchMedia('(prefers-color-scheme: dark)').matches
     )
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentUser] = useState(() => {
     if (typeof window === 'undefined') return null
 
@@ -32,14 +34,37 @@ function ContactUs() {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-    notify({
-      tone: 'success',
-      title: 'Message sent',
-      message: 'Your message has been submitted successfully.',
-    })
-    event.currentTarget.reset()
+    const form = event.currentTarget
+    const data = new FormData(form)
+
+    setIsSubmitting(true)
+    try {
+      await apiFetch('/api/contact', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: data.get('fullName'),
+          email: data.get('email'),
+          subject: data.get('subject'),
+          message: data.get('message'),
+        }),
+      })
+      notify({
+        tone: 'success',
+        title: 'Message sent',
+        message: 'Your message has been submitted successfully.',
+      })
+      form.reset()
+    } catch (err) {
+      notify({
+        tone: 'error',
+        title: 'Submission failed',
+        message: err.message || 'Something went wrong. Please try again.',
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -191,10 +216,11 @@ function ContactUs() {
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand/90"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Send className="h-4 w-4" />
-                    Submit request
+                    {isSubmitting ? 'Sending…' : 'Submit request'}
                   </button>
                 </div>
               </form>

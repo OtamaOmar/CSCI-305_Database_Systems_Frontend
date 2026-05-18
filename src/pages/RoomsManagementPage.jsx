@@ -1,4 +1,4 @@
-import { Bed, CalendarCheck, DoorOpen } from 'lucide-react'
+import { Bed, CalendarCheck, DoorOpen, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
 import useAlert from '../hooks/useAlert'
@@ -17,23 +17,26 @@ function Badge({ value }) {
 }
 
 export default function RoomsManagementPage() {
-  const { notify } = useAlert()
+  const { confirm, notify } = useAlert()
   const currentUser = useCurrentUser()
   const canReserve = hasPermission(currentUser, 'room_reservations:write')
   const [message, setMessage] = useState('')
   const [rooms, setRooms] = useState([])
+  const [reservations, setReservations] = useState([])
   const [patients, setPatients] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   async function loadData() {
     setIsLoading(true)
     try {
-      const [roomsData, patientsData] = await Promise.all([
+      const [roomsData, patientsData, reservationsData] = await Promise.all([
         getRooms(),
         apiFetch('/api/patients'),
+        apiFetch('/api/room-reservations'),
       ])
       setRooms(Array.isArray(roomsData) ? roomsData : [])
       setPatients(Array.isArray(patientsData) ? patientsData : [])
+      setReservations(Array.isArray(reservationsData) ? reservationsData : [])
     } catch (err) {
       notify({ tone: 'error', message: err.message })
     } finally {
@@ -54,6 +57,25 @@ export default function RoomsManagementPage() {
       occupied,
     }
   }, [rooms])
+
+  async function handleCancelReservation(reservationId) {
+    const ok = await confirm({
+      title: 'Cancel reservation?',
+      message: 'This will delete the reservation and mark the room as Available. This cannot be undone.',
+      tone: 'warning',
+      confirmText: 'Cancel reservation',
+      cancelText: 'Keep',
+    })
+    if (!ok) return
+
+    try {
+      await apiFetch(`/api/room-reservations/${reservationId}`, { method: 'DELETE' })
+      notify({ tone: 'success', message: 'Reservation cancelled and room is now available.' })
+      await loadData()
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
+  }
 
   async function handleReserve(event) {
     event.preventDefault()
@@ -140,29 +162,45 @@ export default function RoomsManagementPage() {
                 </div>
               )}
 
-              {rooms.map((room) => (
-                <div
-                  key={room.id}
-                  className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div className="mb-4 flex items-center justify-between">
-                    <Bed className="text-brand" />
-                    <Badge value={room.status} />
-                  </div>
+              {rooms.map((room) => {
+                const activeReservation = reservations.find(
+                  (r) => r.room_id === room.id && r.status !== 'Cancelled'
+                )
+                return (
+                  <div
+                    key={room.id}
+                    className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div className="mb-4 flex items-center justify-between">
+                      <Bed className="text-brand" />
+                      <Badge value={room.status} />
+                    </div>
 
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">{room.room_number}</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{room.type}</p>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">{room.room_number}</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{room.type}</p>
 
-                  <div className="mt-4 space-y-2 text-sm">
-                    <p className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800 dark:text-slate-200">
-                      Assigned Patient: {room.patient}
-                    </p>
-                    <p className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800 dark:text-slate-200">
-                      Room Info: {room.monitor}
-                    </p>
+                    <div className="mt-4 space-y-2 text-sm">
+                      <p className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800 dark:text-slate-200">
+                        Assigned Patient: {room.patient}
+                      </p>
+                      <p className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800 dark:text-slate-200">
+                        Room Info: {room.monitor}
+                      </p>
+                    </div>
+
+                    {canReserve && activeReservation && (
+                      <button
+                        type="button"
+                        onClick={() => handleCancelReservation(activeReservation.id)}
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Cancel Reservation
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
 
               {!isLoading && rooms.length === 0 && (
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:col-span-2">
