@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { useAlert } from '../components/AlertProvider'
+import useAlert from '../hooks/useAlert'
 import { Cog, User } from 'lucide-react'
 
 function Settings() {

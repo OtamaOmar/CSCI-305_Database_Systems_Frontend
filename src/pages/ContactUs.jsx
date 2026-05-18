@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useAlert } from '../components/AlertProvider'
+import useAlert from '../hooks/useAlert'
 import { Headset, Hospital, Mail, MapPin, Phone, Send, Sun, Moon } from 'lucide-react'
 
 function ContactUs() {

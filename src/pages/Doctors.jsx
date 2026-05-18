@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { useAlert } from '../components/AlertProvider'
+import useAlert from '../hooks/useAlert'
 import { Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { apiFetch } from '../lib/api'
+import useCurrentUser from '../hooks/useCurrentUser'
+import { hasPermission } from '../lib/rbac'
 
 const statusFilters = ['All', 'On duty', 'On call', 'Off duty']
 
@@ -13,6 +16,8 @@ const statusStyles = {
 
 function Doctors() {
   const { confirm, notify } = useAlert()
+  const currentUser = useCurrentUser()
+  const canWrite = hasPermission(currentUser, 'doctors:write')
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All')
   const [doctorRows, setDoctorRows] = useState([])
@@ -32,20 +37,42 @@ function Doctors() {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
 
-  async function fetchDoctors() {
+  async function fetchDoctorsData() {
+    const data = await apiFetch('/api/doctors')
+    return Array.isArray(data) ? data : []
+  }
+
+  async function refreshDoctors() {
     try {
-      const response = await fetch('http://localhost:5000/api/doctors')
-      if (!response.ok) throw new Error('Failed to load doctors.')
-      const data = await response.json()
+      const data = await fetchDoctorsData()
       setDoctorRows(data)
     } catch (err) {
       console.error(err)
+      notify({ tone: 'error', message: err.message })
     }
   }
 
   useEffect(() => {
-    fetchDoctors()
-  }, [])
+    let isMounted = true
+
+    const load = async () => {
+      try {
+        const data = await fetchDoctorsData()
+        if (!isMounted) return
+        setDoctorRows(data)
+      } catch (err) {
+        if (!isMounted) return
+        console.error(err)
+        notify({ tone: 'error', message: err.message })
+      }
+    }
+
+    void load()
+
+    return () => {
+      isMounted = false
+    }
+  }, [notify])
 
   async function handleAddDoctor(event) {
     event.preventDefault()
@@ -66,13 +93,11 @@ function Doctors() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/doctors', {
+      await apiFetch('/api/doctors', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nextDoctor),
       })
-      if (!response.ok) throw new Error('Failed to add doctor.')
-      await fetchDoctors()
+      await refreshDoctors()
       form.reset()
       setIsAddOpen(false)
     } catch (err) {
@@ -102,13 +127,11 @@ function Doctors() {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/doctors/${editingDoctor.id}`, {
+      await apiFetch(`/api/doctors/${editingDoctor.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedDoctor),
       })
-      if (!response.ok) throw new Error('Failed to update doctor.')
-      await fetchDoctors()
+      await refreshDoctors()
       setIsEditOpen(false)
       setEditingDoctor(null)
     } catch (err) {
@@ -127,9 +150,8 @@ function Doctors() {
     if (!ok) return
 
     try {
-      const response = await fetch(`http://localhost:5000/api/doctors/${doctorId}`, { method: 'DELETE' })
-      if (!response.ok) throw new Error('Failed to delete doctor.')
-      await fetchDoctors()
+      await apiFetch(`/api/doctors/${doctorId}`, { method: 'DELETE' })
+      await refreshDoctors()
     } catch (err) {
       notify({ tone: 'error', message: err.message })
     }
@@ -173,13 +195,15 @@ function Doctors() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsAddOpen(true)}
-            className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-base font-semibold text-white transition hover:bg-brand/90"
-          >
-            <Plus className="h-4 w-4" /> Add doctor
-          </button>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => setIsAddOpen(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-base font-semibold text-white transition hover:bg-brand/90"
+            >
+              <Plus className="h-4 w-4" /> Add doctor
+            </button>
+          )}
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -254,22 +278,26 @@ function Doctors() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditDoctor(doctor)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteDoctor(doctor.id)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
+                      {canWrite && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEditDoctor(doctor)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDoctor(doctor.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

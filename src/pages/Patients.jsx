@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { useAlert } from '../components/AlertProvider'
+import useAlert from '../hooks/useAlert'
 import { Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { apiFetch } from '../lib/api'
+import useCurrentUser from '../hooks/useCurrentUser'
+import { hasPermission } from '../lib/rbac'
 
 
 const levels = ['All', 'Critical', 'Urgent', 'Stable']
@@ -14,6 +17,8 @@ const levelStyles = {
 
 function Patients() {
   const { confirm, notify } = useAlert()
+  const currentUser = useCurrentUser()
+  const canWrite = hasPermission(currentUser, 'patients:write')
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState('All')
   const [patientRows, setPatientRows] = useState([])
@@ -36,20 +41,17 @@ function Patients() {
 
   async function fetchPatients() {
     try {
-      const response = await fetch('http://localhost:5000/api/patients')
-      if (!response.ok) throw new Error('Failed to load patients.')
-      const data = await response.json()
+      const data = await apiFetch('/api/patients')
       setPatientRows(data)
     } catch (err) {
       console.error(err)
+      notify({ tone: 'error', message: err.message })
     }
   }
 
   async function fetchDoctors() {
     try {
-      const response = await fetch('http://localhost:5000/api/doctors')
-      if (!response.ok) throw new Error('Failed to load doctors.')
-      const data = await response.json()
+      const data = await apiFetch('/api/doctors')
       setDoctorOptions(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error(err)
@@ -80,12 +82,10 @@ function Patients() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/patients', {
+      await apiFetch('/api/patients', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nextPatient),
       })
-      if (!response.ok) throw new Error('Failed to add patient.')
       await fetchPatients()
       form.reset()
       setIsAddOpen(false)
@@ -116,14 +116,17 @@ function Patients() {
       level: String(formData.get('level') || '').trim(),
     }
 
-    await fetch(`http://localhost:5000/api/patients/${editingPatient.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedPatient),
-    })
-    await fetchPatients()
-    setIsEditOpen(false)
-    setEditingPatient(null)
+    try {
+      await apiFetch(`/api/patients/${editingPatient.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedPatient),
+      })
+      await fetchPatients()
+      setIsEditOpen(false)
+      setEditingPatient(null)
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
   }
 
   async function handleDeletePatient(patientId) {
@@ -136,8 +139,12 @@ function Patients() {
     })
     if (!ok) return
 
-    await fetch(`http://localhost:5000/api/patients/${patientId}`, { method: 'DELETE' })
-    await fetchPatients()
+    try {
+      await apiFetch(`/api/patients/${patientId}`, { method: 'DELETE' })
+      await fetchPatients()
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    }
   }
 
   const filtered = useMemo(() => {
@@ -184,13 +191,15 @@ function Patients() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsAddOpen(true)}
-            className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-base font-semibold text-white transition hover:bg-brand/90"
-          >
-            <Plus className="h-4 w-4" /> Add patient
-          </button>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => setIsAddOpen(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-base font-semibold text-white transition hover:bg-brand/90"
+            >
+              <Plus className="h-4 w-4" /> Add patient
+            </button>
+          )}
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -265,22 +274,26 @@ function Patients() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditPatient(patient)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePatient(patient.id)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
+                      {canWrite && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEditPatient(patient)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePatient(patient.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-400 dark:hover:bg-red-950/60"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

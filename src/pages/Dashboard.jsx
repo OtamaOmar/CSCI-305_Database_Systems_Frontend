@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import TopBar from '../components/TopBar'
-import { useAlert } from '../components/AlertProvider'
+import useAlert from '../hooks/useAlert'
+import { apiFetch, clearAuth } from '../lib/api'
 import {
   Activity,
   AlertTriangle,
@@ -10,17 +11,26 @@ import {
   ClipboardList,
   MoreHorizontal,
   Stethoscope,
-  UserPlus,
-  Ambulance,
+  Building2,
   FileText,
+  MapPin,
+  Pill,
+  BedDouble,
+  Users,
+  Layers,
 } from 'lucide-react'
 
 const quickActions = [
-  { label: 'Register patient', sub: 'Open workflow', icon: UserPlus, to: '/patient' },
-  { label: 'Incoming ambulance', sub: 'Open workflow', icon: Ambulance },
-  { label: 'New triage', sub: 'Open workflow', icon: ClipboardList },
-  { label: 'Staff schedule', sub: 'View shifts', icon: CalendarDays, to: '/staff' },
-  { label: 'Generate report', sub: 'Open workflow', icon: FileText },
+  { label: 'Patients', sub: 'Records & profiles', icon: Users, to: '/patient' },
+  { label: 'Appointments', sub: 'Schedule & manage', icon: CalendarDays, to: '/appointments' },
+  { label: 'Emergency Ops', sub: 'Phase 2 module', icon: AlertTriangle, to: '/emergency-operations' },
+  { label: 'Reports', sub: 'Charts & exports', icon: FileText, to: '/reports-dashboard' },
+  { label: 'Rooms', sub: 'Availability & booking', icon: BedDouble, to: '/rooms-management' },
+  { label: 'Departments', sub: 'Manage organization', icon: Layers, to: '/departments-page' },
+  { label: 'Locations', sub: 'Hospital map', icon: MapPin, to: '/hospital-locations' },
+  { label: 'Prescriptions', sub: 'Orders & history', icon: Pill, to: '/prescriptions' },
+  { label: 'Files', sub: 'Uploads & documents', icon: Building2, to: '/reports-dashboard' },
+  { label: 'Admin', sub: 'Users & invitations', icon: Users, to: '/admin-panel' },
 ]
 
 const alertToneClass = {
@@ -87,19 +97,21 @@ function Dashboard() {
   useEffect(() => {
     let isMounted = true
 
-    const fetchList = async (url, label) => {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error(`${label} request failed.`)
-      const data = await response.json()
-      return Array.isArray(data) ? data : []
+    const fetchList = async (path, label) => {
+      try {
+        const data = await apiFetch(path)
+        return Array.isArray(data) ? data : []
+      } catch (err) {
+        throw new Error(`${label} request failed.`, { cause: err })
+      }
     }
 
     const loadDashboard = async () => {
       const [casesResult, doctorsResult, patientsResult, alertsResult] = await Promise.allSettled([
-        fetchList('http://localhost:5000/api/cases', 'Cases'),
-        fetchList('http://localhost:5000/api/doctors', 'Doctors'),
-        fetchList('http://localhost:5000/api/patients', 'Patients'),
-        fetchList('http://localhost:5000/api/notifications', 'Alerts'),
+        fetchList('/api/cases', 'Cases'),
+        fetchList('/api/doctors', 'Doctors'),
+        fetchList('/api/patients', 'Patients'),
+        fetchList('/api/notifications', 'Alerts'),
       ])
 
       if (!isMounted) return
@@ -287,7 +299,10 @@ function Dashboard() {
           </div>
 
           <Link
-            to="/"
+            to="/login"
+            onClick={() => {
+              clearAuth()
+            }}
             className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Sign out

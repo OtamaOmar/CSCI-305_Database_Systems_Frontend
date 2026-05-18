@@ -1,14 +1,64 @@
 import { FileText, FileUp, ScanLine } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { mockMedicalFiles } from './hospitalData'
+import useAlert from '../hooks/useAlert'
+import { apiFetch } from '../lib/api'
+import useCurrentUser from '../hooks/useCurrentUser'
+import { hasPermission } from '../lib/rbac'
 
 export default function MedicalFilesPage() {
+  const { notify } = useAlert()
+  const currentUser = useCurrentUser()
+  const canWrite = hasPermission(currentUser, 'medical_files:write')
   const [message, setMessage] = useState('')
+  const [files, setFiles] = useState([])
+  const [patients, setPatients] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  function handleUpload(event) {
+  async function loadData() {
+    setIsLoading(true)
+    try {
+      const [filesData, patientsData] = await Promise.all([
+        apiFetch('/api/medical-files'),
+        apiFetch('/api/patients'),
+      ])
+      setFiles(Array.isArray(filesData) ? filesData : [])
+      setPatients(Array.isArray(patientsData) ? patientsData : [])
+    } catch (err) {
+      notify({ tone: 'error', message: err.message })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function handleUpload(event) {
     event.preventDefault()
-    setMessage('Demo mode: file upload UI is ready for backend static file serving.')
+    const data = new FormData(event.target)
+    const patient = data.get('patient')
+    const fileType = data.get('file_type')
+    const file = data.get('file')
+
+    const fileName = file && typeof file === 'object' && file.name ? file.name : ''
+
+    try {
+      await apiFetch('/api/medical-files', {
+        method: 'POST',
+        body: JSON.stringify({
+          patient,
+          file_type: fileType,
+          file_name: fileName || data.get('file_name'),
+        }),
+      })
+      setMessage('File record created.')
+      event.target.reset()
+      await loadData()
+    } catch (err) {
+      setMessage(err.message)
+    }
   }
 
   return (
@@ -52,19 +102,35 @@ export default function MedicalFilesPage() {
                 </thead>
 
                 <tbody>
-                  {mockMedicalFiles.map((file) => (
+                  {isLoading && (
+                    <tr className="border-t border-slate-100 dark:border-slate-800">
+                      <td colSpan={6} className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                        Loading files…
+                      </td>
+                    </tr>
+                  )}
+
+                  {files.map((file) => (
                     <tr
                       key={file.id}
                       className="border-t border-slate-100 dark:border-slate-800 dark:text-slate-200"
                     >
                       <td className="px-5 py-4 font-semibold">{file.id}</td>
                       <td className="px-5 py-4">{file.patient}</td>
-                      <td className="px-5 py-4">{file.type}</td>
-                      <td className="px-5 py-4">{file.name}</td>
-                      <td className="px-5 py-4">{file.uploaded}</td>
-                      <td className="px-5 py-4">{file.size}</td>
+                      <td className="px-5 py-4">{file.file_type}</td>
+                      <td className="px-5 py-4">{file.file_name}</td>
+                      <td className="px-5 py-4">{file.uploaded_date}</td>
+                      <td className="px-5 py-4">{file.size || '—'}</td>
                     </tr>
                   ))}
+
+                  {!isLoading && files.length === 0 && (
+                    <tr className="border-t border-slate-100 dark:border-slate-800">
+                      <td colSpan={6} className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                        No files uploaded yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -76,14 +142,24 @@ export default function MedicalFilesPage() {
               Upload Scan / Report
             </h2>
 
-            <form onSubmit={handleUpload} className="space-y-4">
+            {!canWrite && (
+              <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                You don&apos;t have permission to upload medical files.
+              </p>
+            )}
+
+            {canWrite && (
+              <form onSubmit={handleUpload} className="space-y-4">
               <input
+                name="patient"
                 required
-                placeholder="Patient name"
+                list="patient-options"
+                placeholder="Patient name or ID"
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               />
 
               <select
+                name="file_type"
                 required
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               >
@@ -95,6 +171,7 @@ export default function MedicalFilesPage() {
               </select>
 
               <input
+                name="file"
                 type="file"
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               />
@@ -108,7 +185,21 @@ export default function MedicalFilesPage() {
                 <ScanLine className="mr-2 inline h-4 w-4" />
                 Upload File
               </button>
-            </form>
+              </form>
+            )}
+
+            <datalist id="patient-options">
+              {patients.map((patient) => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.name}
+                </option>
+              ))}
+              {patients.map((patient) => (
+                <option key={`${patient.id}-name`} value={patient.name}>
+                  {patient.id}
+                </option>
+              ))}
+            </datalist>
 
             {message && (
               <p className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">

@@ -12,7 +12,9 @@ import Doctors from './pages/Doctors'
 import Emergency from './pages/Emergency'
 import HospitalOperations from './pages/HospitalOperations'
 import LoginPage from './auth/Login'
+import OnboardPage from './auth/Onboard'
 import SignupPage from './auth/Signup'
+import AcceptInvitePage from './auth/AcceptInvite'
 import ReportsDashboardPage from './pages/ReportsDashboardPage'
 import AppointmentsPage from './pages/AppointmentsPage'
 import BookAppointmentPage from './pages/BookAppointmentPage'
@@ -24,6 +26,7 @@ import HospitalLocationsPage from './pages/HospitalLocationsPage'
 import PrescriptionsPage from './pages/PrescriptionsPage'
 import MedicalFilesPage from './pages/MedicalFilesPage'
 import AdminPanelPage from './pages/AdminPanelPage'
+import RequireAuth from './components/RequireAuth'
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -41,39 +44,10 @@ const loginRoute = createRoute({
   component: LoginPage,
 })
 
-const dashboardRoute = createRoute({
+const onboardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/dashboard',
-  component: Dashboard,
-})
-
-const contactRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/contact-us',
-  component: ContactUs,
-})
-
-const patientRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/patient',
-  component: Patients,
-})
-
-const doctorsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/doctors',
-  component: Doctors,
-})
-
-const emergencyRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/emergency',
-  component: Emergency,
-})
-const hospitalOperationsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/hospital-operations',
-  component: HospitalOperations,
+  path: '/onboard',
+  component: OnboardPage,
 })
 
 const signupRoute = createRoute({
@@ -82,105 +56,236 @@ const signupRoute = createRoute({
   component: SignupPage,
 })
 
+const acceptInviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/accept-invite',
+  component: AcceptInvitePage,
+})
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard',
+  component: () => (
+    <RequireAuth>
+      <Dashboard />
+    </RequireAuth>
+  ),
+})
+
+const contactRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/contact-us',
+  component: () => (
+    <RequireAuth>
+      <ContactUs />
+    </RequireAuth>
+  ),
+})
+
+const patientRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/patient',
+  component: () => (
+    <RequireAuth>
+      <Patients />
+    </RequireAuth>
+  ),
+})
+
+const doctorsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/doctors',
+  component: () => (
+    <RequireAuth>
+      <Doctors />
+    </RequireAuth>
+  ),
+})
+
+const emergencyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/emergency',
+  component: () => (
+    <RequireAuth>
+      <Emergency />
+    </RequireAuth>
+  ),
+})
+const hospitalOperationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/hospital-operations',
+  component: () => (
+    <RequireAuth>
+      <HospitalOperations />
+    </RequireAuth>
+  ),
+})
+
 const chartsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/charts',
-  component: Charts,
+  component: () => (
+    <RequireAuth>
+      <Charts />
+    </RequireAuth>
+  ),
 })
 
 const staffRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/staff',
-  component: StaffSchedule,
+  component: () => (
+    <RequireAuth>
+      <StaffSchedule />
+    </RequireAuth>
+  ),
 })
 
 const notificationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/notifications',
-  component: Notifications,
+  component: () => (
+    <RequireAuth>
+      <Notifications />
+    </RequireAuth>
+  ),
 })
 
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
-  component: Settings,
+  component: () => (
+    <RequireAuth>
+      <Settings />
+    </RequireAuth>
+  ),
 })
 
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profile',
-  component: Profile,
+  component: () => (
+    <RequireAuth>
+      <Profile />
+    </RequireAuth>
+  ),
 })
 const reportsDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/reports-dashboard',
-  component: ReportsDashboardPage,
+  component: () => (
+    <RequireAuth>
+      <ReportsDashboardPage />
+    </RequireAuth>
+  ),
 })
 
 const appointmentsPageRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/appointments',
-  component: AppointmentsPage,
+  component: () => (
+    <RequireAuth>
+      <AppointmentsPage />
+    </RequireAuth>
+  ),
 })
 
 const bookAppointmentRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/book-appointment',
-  component: BookAppointmentPage,
+  component: () => (
+    <RequireAuth>
+      <BookAppointmentPage />
+    </RequireAuth>
+  ),
 })
 
 const appointmentDetailsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/appointment-details',
-  component: AppointmentDetailsPage,
+  component: () => (
+    <RequireAuth>
+      <AppointmentDetailsPage />
+    </RequireAuth>
+  ),
 })
 
 const emergencyOperationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/emergency-operations',
-  component: EmergencyOperationsPage,
+  component: () => (
+    <RequireAuth>
+      <EmergencyOperationsPage />
+    </RequireAuth>
+  ),
 })
 
 const roomsManagementRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/rooms-management',
-  component: RoomsManagementPage,
+  component: () => (
+    <RequireAuth>
+      <RoomsManagementPage />
+    </RequireAuth>
+  ),
 })
 
 const departmentsPageRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/departments-page',
-  component: DepartmentsPage,
+  component: () => (
+    <RequireAuth>
+      <DepartmentsPage />
+    </RequireAuth>
+  ),
 })
 
 const hospitalLocationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/hospital-locations',
-  component: HospitalLocationsPage,
+  component: () => (
+    <RequireAuth>
+      <HospitalLocationsPage />
+    </RequireAuth>
+  ),
 })
 
 const prescriptionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/prescriptions',
-  component: PrescriptionsPage,
+  component: () => (
+    <RequireAuth>
+      <PrescriptionsPage />
+    </RequireAuth>
+  ),
 })
 
 const medicalFilesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/medical-files',
-  component: MedicalFilesPage,
+  component: () => (
+    <RequireAuth>
+      <MedicalFilesPage />
+    </RequireAuth>
+  ),
 })
 
 const adminPanelRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/admin-panel',
-  component: AdminPanelPage,
+  component: () => (
+    <RequireAuth>
+      <AdminPanelPage />
+    </RequireAuth>
+  ),
 })
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  onboardRoute,
   signupRoute,
+  acceptInviteRoute,
   dashboardRoute,
   contactRoute,
   chartsRoute,

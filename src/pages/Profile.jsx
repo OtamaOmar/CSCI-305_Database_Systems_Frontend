@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { useAlert } from '../components/AlertProvider'
-import { Lock, Mail, Phone, User } from 'lucide-react'
+import useAlert from '../hooks/useAlert'
+import { Lock, Mail, User } from 'lucide-react'
 
 function Profile() {
   const { notify } = useAlert()

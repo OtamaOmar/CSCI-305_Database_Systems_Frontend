@@ -1,8 +1,36 @@
 import { MapPin, Navigation, Building2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { mockLocations } from './hospitalData'
+import useAlert from '../hooks/useAlert'
+import { getLocations } from './hospitalApi'
 
 export default function HospitalLocationsPage() {
+  const { notify } = useAlert()
+  const [locations, setLocations] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+    const load = async () => {
+      setIsLoading(true)
+      try {
+        const data = await getLocations()
+        if (!isMounted) return
+        setLocations(Array.isArray(data) ? data : [])
+      } catch (err) {
+        if (!isMounted) return
+        notify({ tone: 'error', message: err.message })
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [notify])
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <TopBar activePath="/hospital-locations" showNotifications showUserMenu />
@@ -29,7 +57,13 @@ export default function HospitalLocationsPage() {
             </h2>
 
             <div className="space-y-4">
-              {mockLocations.map((location) => (
+              {isLoading && (
+                <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                  Loading locations…
+                </div>
+              )}
+
+              {locations.map((location) => (
                 <div
                   key={location.id}
                   className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800"
@@ -45,20 +79,26 @@ export default function HospitalLocationsPage() {
                     </div>
 
                     <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-bold text-brand">
-                      {location.distance}
+                      {location.type}
                     </span>
                   </div>
 
                   <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
                     <p className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800 dark:text-slate-200">
-                      Nearest Department: {location.nearestDepartment}
+                      Address: {location.address}
                     </p>
                     <p className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800 dark:text-slate-200">
-                      Availability: {location.availability}
+                      Coordinates: {location.latitude ?? '—'}, {location.longitude ?? '—'}
                     </p>
                   </div>
                 </div>
               ))}
+
+              {!isLoading && locations.length === 0 && (
+                <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                  No locations configured yet. (Phase 2 module placeholder)
+                </div>
+              )}
             </div>
           </section>
 

@@ -11,7 +11,7 @@ function getEmailFromQuery() {
   return params.get("email") || "";
 }
 
-export default function SignupPage() {
+export default function AcceptInvitePage() {
   const navigate = useNavigate();
   const { notify } = useAlert();
   const [loading, setLoading] = useState(false);
@@ -23,9 +23,9 @@ export default function SignupPage() {
 
     const data = new FormData(e.target);
     const body = {
+      email: data.get("email"),
       first_name: data.get("first_name"),
       last_name: data.get("last_name"),
-      email: data.get("email"),
       password: data.get("password"),
     };
 
@@ -47,11 +47,11 @@ export default function SignupPage() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      subtitle="Use your invitation email to finish registration."
+      title="Accept invitation"
+      subtitle="Complete your account setup to join your hospital."
       footer={
         <>
-          Already have an account?{" "}
+          Already registered?{" "}
           <Link
             to="/login"
             className="font-medium text-light-text hover:text-brand dark:text-dark-text"
@@ -88,12 +88,8 @@ export default function SignupPage() {
           disabled={loading}
           className="mt-2 inline-flex w-full items-center justify-center rounded-md bg-light-secondary px-4 py-2.5 text-[13px] font-semibold text-light-card transition hover:opacity-90 disabled:opacity-60 dark:bg-dark-accent dark:text-dark-text"
         >
-          {loading ? "Creating account..." : "Create account"}
+          {loading ? "Creating account…" : "Create account"}
         </button>
-
-        <p className="text-center text-[11px] text-light-secondary/70 dark:text-dark-text/70">
-          By continuing you agree to our Terms and Privacy Policy.
-        </p>
       </form>
     </AuthLayout>
   );

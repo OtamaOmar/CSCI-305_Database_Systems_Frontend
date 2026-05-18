@@ -4,35 +4,10 @@ import { useEffect, useState } from 'react'
 
 const defaultNavItems = [
   { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Patients', to: '/patient' },
-  { label: 'Doctors', to: '/doctors' },
-  { label: 'Emergency', to: '/emergency' },
-  { label: 'Staff', to: '/staff' },
+  { label: 'Charts', to: '/charts' },
 ]
 
-const hospitalFeatureNavItems = [
-  { label: 'Appointments', to: '/appointments' },
-  { label: 'Emergency Ops', to: '/emergency-operations' },
-  { label: 'Reports', to: '/reports-dashboard' },
-  { label: 'Rooms', to: '/rooms-management' },
-  { label: 'Departments', to: '/departments-page' },
-  { label: 'Locations', to: '/hospital-locations' },
-  { label: 'Prescriptions', to: '/prescriptions' },
-  { label: 'Files', to: '/medical-files' },
-  { label: 'Admin', to: '/admin-panel' },
-]
-
-function mergeNavItems(items = []) {
-  const merged = new Map()
-
-  ;[...items, ...hospitalFeatureNavItems].forEach((item) => {
-    if (!merged.has(item.to)) {
-      merged.set(item.to, item)
-    }
-  })
-
-  return Array.from(merged.values())
-}
+const allowedTopbarPaths = new Set(['/dashboard', '/charts'])
 
 function TopBar({
   navItems = defaultNavItems,
@@ -104,7 +79,10 @@ function TopBar({
         .toUpperCase() || currentUser.email?.charAt(0)?.toUpperCase() || 'U'
     : 'U'
 
-  const visibleNavItems = mergeNavItems(navItems)
+  const filteredNavItems = (Array.isArray(navItems) ? navItems : defaultNavItems).filter((item) =>
+    allowedTopbarPaths.has(item.to)
+  )
+  const visibleNavItems = filteredNavItems.length > 0 ? filteredNavItems : defaultNavItems
 
   return (
     <header className="border-b border-slate-200 bg-slate-100/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">

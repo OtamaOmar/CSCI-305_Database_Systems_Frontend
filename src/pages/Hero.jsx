@@ -95,10 +95,17 @@ function Hero() {
 
               <div className="mt-10 flex flex-wrap gap-4">
                 <Link
-                  to="/signup"
+                  to="/onboard"
                   className="inline-flex items-center gap-3 rounded-2xl bg-light-secondary px-8 py-4 text-lg font-semibold text-light-card transition hover:brightness-110 dark:bg-dark-accent"
                 >
-                  Get started free
+                  Set up hospital
+                  <MoveRight className="h-5 w-5" />
+                </Link>
+                <Link
+                  to="/signup"
+                  className="inline-flex items-center gap-3 rounded-2xl border border-dark-border/20 bg-light-card px-8 py-4 text-lg font-semibold text-light-secondary transition hover:bg-light-bg dark:border-dark-border dark:bg-dark-card dark:text-dark-text dark:hover:bg-dark-bg"
+                >
+                  Sign up
                   <MoveRight className="h-5 w-5" />
                 </Link>
                 <Link

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { useAlert } from '../components/AlertProvider'
+import useAlert from '../hooks/useAlert'
 import { Filter, MoreHorizontal, Plus, Search, Siren } from 'lucide-react'
+import { apiFetch } from '../lib/api'
 
 const statusFilters = ['All', 'Incoming', 'In treatment', 'Stabilized', 'Discharged']
 
@@ -40,20 +41,17 @@ function Emergency() {
 
   async function fetchCases() {
     try {
-      const response = await fetch('http://localhost:5000/api/cases')
-      if (!response.ok) throw new Error('Failed to load cases.')
-      const data = await response.json()
+      const data = await apiFetch('/api/cases')
       setCaseRows(data)
     } catch (err) {
       console.error(err)
+      notify({ tone: 'error', message: err.message })
     }
   }
 
   async function fetchDoctors() {
     try {
-      const response = await fetch('http://localhost:5000/api/doctors')
-      if (!response.ok) throw new Error('Failed to load doctors.')
-      const data = await response.json()
+      const data = await apiFetch('/api/doctors')
       setDoctorOptions(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error(err)
@@ -88,12 +86,10 @@ function Emergency() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/cases', {
+      await apiFetch('/api/cases', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nextCase),
       })
-      if (!response.ok) throw new Error('Failed to add case.')
       await fetchCases()
       form.reset()
       setIsAddOpen(false)

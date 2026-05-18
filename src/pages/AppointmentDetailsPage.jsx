@@ -1,8 +1,9 @@
 import { Link, useSearch } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { cancelAppointment, updateAppointment } from './hospitalApi'
-import { getStatusClass, mockAppointments } from './hospitalData'
+import useAlert from '../hooks/useAlert'
+import { cancelAppointment, getAppointmentById, updateAppointment } from './hospitalApi'
+import { getStatusClass } from './hospitalData'
 
 function Badge({ value }) {
   return (
@@ -13,14 +14,42 @@ function Badge({ value }) {
 }
 
 export default function AppointmentDetailsPage() {
+  const { notify } = useAlert()
   const search = useSearch({ strict: false })
-  const appointmentId = search.id || 'APT-1001'
+  const appointmentId = search.id
 
-  const appointment = useMemo(() => {
-    return mockAppointments.find((item) => item.id === appointmentId) || mockAppointments[0]
-  }, [appointmentId])
+  const [appointment, setAppointment] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+    const load = async () => {
+      if (!appointmentId) {
+        setAppointment(null)
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      try {
+        const data = await getAppointmentById(appointmentId)
+        if (!isMounted) return
+        setAppointment(data)
+      } catch (err) {
+        if (!isMounted) return
+        notify({ tone: 'error', message: err.message })
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [appointmentId, notify])
 
   async function handleUpdate(event) {
     event.preventDefault()
@@ -31,23 +60,22 @@ export default function AppointmentDetailsPage() {
       date: data.get('date'),
       time: data.get('time'),
       status: data.get('status'),
-      payment: data.get('payment'),
     }
 
     try {
       await updateAppointment(appointment.id, updatedData)
-      setMessage('Appointment updated through backend API.')
-    } catch {
-      setMessage('Demo mode: update form is ready for backend integration.')
+      setMessage('Appointment updated.')
+    } catch (err) {
+      setMessage(err.message)
     }
   }
 
   async function handleCancel() {
     try {
       await cancelAppointment(appointment.id)
-      setMessage('Appointment cancelled and refund request sent through backend API.')
-    } catch {
-      setMessage('Demo mode: cancel/refund workflow is ready for backend integration.')
+      setMessage('Appointment cancelled.')
+    } catch (err) {
+      setMessage(err.message)
     }
   }
 
@@ -70,6 +98,23 @@ export default function AppointmentDetailsPage() {
         </p>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          {isLoading && (
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-3">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Loading appointment…</p>
+            </div>
+          )}
+
+          {!isLoading && !appointment && (
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-3">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Appointment not found.</p>
+              <Link to="/appointments" className="mt-3 inline-block font-semibold text-brand">
+                Back to appointments
+              </Link>
+            </div>
+          )}
+
+          {!isLoading && appointment && (
+            <>
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
             <h2 className="mb-4 text-xl font-bold text-slate-900 dark:text-white">
               Appointment Information
@@ -162,24 +207,9 @@ export default function AppointmentDetailsPage() {
                   defaultValue={appointment.status}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                 >
-                  <option>Confirmed</option>
-                  <option>Pending</option>
+                  <option>Scheduled</option>
                   <option>Cancelled</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold dark:text-slate-200">
-                  Payment
-                </label>
-                <select
-                  name="payment"
-                  defaultValue={appointment.payment}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                >
-                  <option>Paid</option>
-                  <option>Unpaid</option>
-                  <option>Insurance pending</option>
+                  <option>Completed</option>
                 </select>
               </div>
 
@@ -209,6 +239,8 @@ export default function AppointmentDetailsPage() {
               </p>
             )}
           </div>
+            </>
+          )}
         </div>
       </main>
     </div>

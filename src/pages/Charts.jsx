@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { useAlert } from '../components/AlertProvider'
+import useAlert from '../hooks/useAlert'
+import { apiFetch } from '../lib/api'
 import { BarChart3 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -63,18 +64,20 @@ function Charts() {
   useEffect(() => {
     let isMounted = true
 
-    const fetchList = async (url, label) => {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error(`${label} request failed.`)
-      const data = await response.json()
-      return Array.isArray(data) ? data : []
+    const fetchList = async (path, label) => {
+      try {
+        const data = await apiFetch(path)
+        return Array.isArray(data) ? data : []
+      } catch (err) {
+        throw new Error(`${label} request failed.`, { cause: err })
+      }
     }
 
     const loadCharts = async () => {
       const [casesResult, doctorsResult, patientsResult] = await Promise.allSettled([
-        fetchList('http://localhost:5000/api/cases', 'Cases'),
-        fetchList('http://localhost:5000/api/doctors', 'Doctors'),
-        fetchList('http://localhost:5000/api/patients', 'Patients'),
+        fetchList('/api/cases', 'Cases'),
+        fetchList('/api/doctors', 'Doctors'),
+        fetchList('/api/patients', 'Patients'),
       ])
 
       if (!isMounted) return

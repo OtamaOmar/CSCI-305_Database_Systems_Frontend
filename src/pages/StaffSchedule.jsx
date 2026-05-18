@@ -1,82 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
 import { CalendarDays, Clock, Users } from 'lucide-react'
+import useAlert from '../hooks/useAlert'
+import { apiFetch } from '../lib/api'
 
-const shiftSummary = [
-  {
-    label: 'Morning shift',
-    time: '07:00 - 15:00',
-    onDuty: 18,
-    note: '5 doctors, 13 nurses',
-    tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  },
-  {
-    label: 'Evening shift',
-    time: '15:00 - 23:00',
-    onDuty: 16,
-    note: '4 doctors, 12 nurses',
-    tone: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  },
-  {
-    label: 'Night shift',
-    time: '23:00 - 07:00',
-    onDuty: 12,
-    note: '3 doctors, 9 nurses',
-    tone: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
-  },
-]
-
-const weeklySchedule = [
-  {
-    day: 'Monday',
-    morning: 'ER Team A',
-    evening: 'ER Team B',
-    night: 'ICU Team C',
-  },
-  {
-    day: 'Tuesday',
-    morning: 'Trauma Team A',
-    evening: 'ER Team C',
-    night: 'Surgery Team B',
-  },
-  {
-    day: 'Wednesday',
-    morning: 'ER Team B',
-    evening: 'Pediatrics Team A',
-    night: 'ICU Team A',
-  },
-  {
-    day: 'Thursday',
-    morning: 'Cardio Team A',
-    evening: 'ER Team A',
-    night: 'Surgery Team C',
-  },
-  {
-    day: 'Friday',
-    morning: 'ER Team C',
-    evening: 'Trauma Team B',
-    night: 'ICU Team B',
-  },
-  {
-    day: 'Saturday',
-    morning: 'ER Team A',
-    evening: 'ER Team B',
-    night: 'ICU Team C',
-  },
-  {
-    day: 'Sunday',
-    morning: 'Pediatrics Team B',
-    evening: 'ER Team C',
-    night: 'Surgery Team A',
-  },
-]
-
-const availabilityRows = [
-  { name: 'Dr. Sara Ahmed', role: 'ED Lead', status: 'On duty', nextShift: 'Today · Morning' },
-  { name: 'Dr. Karim Nasser', role: 'Trauma', status: 'On call', nextShift: 'Tonight · Night' },
-  { name: 'Dr. Mei Chen', role: 'Pediatrics', status: 'Available', nextShift: 'Tomorrow · Morning' },
-  { name: 'Dr. Tom Becker', role: 'Cardiology', status: 'Off duty', nextShift: 'Tomorrow · Evening' },
-]
+const shiftMeta = {
+  Morning: { label: 'Morning shift', tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  Evening: { label: 'Evening shift', tone: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+  Night: { label: 'Night shift', tone: 'bg-slate-500/10 text-slate-600 dark:text-slate-400' },
+}
 
 const statusStyles = {
   'On duty': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -86,6 +18,7 @@ const statusStyles = {
 }
 
 function StaffSchedule() {
+  const { notify } = useAlert()
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -98,6 +31,82 @@ function StaffSchedule() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
   }, [isDark])
+
+  const [schedules, setSchedules] = useState([])
+  const [doctors, setDoctors] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const load = async () => {
+      setIsLoading(true)
+      try {
+        const [scheduleData, doctorData] = await Promise.all([
+          apiFetch('/api/staff-schedule'),
+          apiFetch('/api/doctors'),
+        ])
+        if (!isMounted) return
+        setSchedules(Array.isArray(scheduleData) ? scheduleData : [])
+        setDoctors(Array.isArray(doctorData) ? doctorData : [])
+      } catch (err) {
+        if (!isMounted) return
+        notify({ tone: 'error', message: err.message })
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [notify])
+
+  const weeklySchedule = useMemo(() => {
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const byDayShift = new Map()
+
+    schedules.forEach((row) => {
+      const date = new Date(row.date)
+      const day = Number.isNaN(date.getTime()) ? '—' : weekdays[date.getDay()]
+      const key = `${day}:${row.shift}`
+      byDayShift.set(key, (byDayShift.get(key) || 0) + 1)
+    })
+
+    return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => ({
+      day,
+      morning: `${byDayShift.get(`${day}:Morning`) || 0} scheduled`,
+      evening: `${byDayShift.get(`${day}:Evening`) || 0} scheduled`,
+      night: `${byDayShift.get(`${day}:Night`) || 0} scheduled`,
+    }))
+  }, [schedules])
+
+  const shiftSummary = useMemo(() => {
+    const today = new Date()
+    const todayKey = today.toISOString().slice(0, 10)
+    const todaysSchedules = schedules.filter((row) => row.date === todayKey)
+
+    const countForShift = (shift) => todaysSchedules.filter((row) => row.shift === shift).length
+
+    return ['Morning', 'Evening', 'Night'].map((shift) => ({
+      label: shiftMeta[shift].label,
+      time: shift === 'Morning' ? '07:00 - 15:00' : shift === 'Evening' ? '15:00 - 23:00' : '23:00 - 07:00',
+      onDuty: countForShift(shift),
+      note: 'Based on schedules',
+      tone: shiftMeta[shift].tone,
+    }))
+  }, [schedules])
+
+  const availabilityRows = useMemo(() => {
+    const nowLabel = 'This week'
+    return doctors.slice(0, 8).map((doctor) => ({
+      name: doctor.name,
+      role: doctor.specialty || doctor.department || 'Doctor',
+      status: doctor.status || 'Available',
+      nextShift: nowLabel,
+    }))
+  }, [doctors])
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -161,6 +170,13 @@ function StaffSchedule() {
                 </tr>
               </thead>
               <tbody>
+                {isLoading && (
+                  <tr className="border-t border-slate-200 dark:border-slate-700">
+                    <td className="px-5 py-4 text-slate-600 dark:text-slate-400" colSpan={4}>
+                      Loading schedule…
+                    </td>
+                  </tr>
+                )}
                 {weeklySchedule.map((row) => (
                   <tr key={row.day} className="border-t border-slate-200 dark:border-slate-700">
                     <td className="px-5 py-4 font-semibold text-slate-900 dark:text-slate-100">{row.day}</td>

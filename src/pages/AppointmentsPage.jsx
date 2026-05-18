@@ -1,22 +1,53 @@
 import { Link } from '@tanstack/react-router'
 import { CalendarDays, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
-import { getStatusClass, mockAppointments } from './hospitalData'
+import useAlert from '../hooks/useAlert'
+import { getStatusClass } from './hospitalData'
+import { getAppointments } from './hospitalApi'
+import useCurrentUser from '../hooks/useCurrentUser'
+import { hasPermission } from '../lib/rbac'
 
 function Badge({ value }) {
   return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(value)}`}>{value}</span>
 }
 
 export default function AppointmentsPage() {
+  const { notify } = useAlert()
+  const currentUser = useCurrentUser()
+  const canWrite = hasPermission(currentUser, 'appointments:write')
   const [search, setSearch] = useState('')
   const [doctorFilter, setDoctorFilter] = useState('All')
   const [dateFilter, setDateFilter] = useState('')
+  const [appointments, setAppointments] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const doctors = ['All', ...new Set(mockAppointments.map((item) => item.doctor))]
+  useEffect(() => {
+    let isMounted = true
+    const load = async () => {
+      setIsLoading(true)
+      try {
+        const data = await getAppointments()
+        if (!isMounted) return
+        setAppointments(Array.isArray(data) ? data : [])
+      } catch (err) {
+        if (!isMounted) return
+        notify({ tone: 'error', message: err.message })
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [notify])
+
+  const doctors = useMemo(() => ['All', ...new Set(appointments.map((item) => item.doctor).filter(Boolean))], [appointments])
 
   const filteredAppointments = useMemo(() => {
-    return mockAppointments.filter((appointment) => {
+    return appointments.filter((appointment) => {
       const text = search.toLowerCase()
       const matchesSearch =
         !text ||
@@ -29,7 +60,7 @@ export default function AppointmentsPage() {
 
       return matchesSearch && matchesDoctor && matchesDate
     })
-  }, [search, doctorFilter, dateFilter])
+  }, [appointments, search, doctorFilter, dateFilter])
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -45,13 +76,15 @@ export default function AppointmentsPage() {
             </p>
           </div>
 
-          <Link
-            to="/book-appointment"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 font-semibold text-white"
-          >
-            <CalendarDays size={18} />
-            Book Appointment
-          </Link>
+          {canWrite && (
+            <Link
+              to="/book-appointment"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 font-semibold text-white"
+            >
+              <CalendarDays size={18} />
+              Book Appointment
+            </Link>
+          )}
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-4">
@@ -114,6 +147,13 @@ export default function AppointmentsPage() {
                 </tr>
               </thead>
               <tbody>
+                {isLoading && (
+                  <tr className="border-t border-slate-100 dark:border-slate-800">
+                    <td colSpan={8} className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                      Loading appointments…
+                    </td>
+                  </tr>
+                )}
                 {filteredAppointments.map((appointment) => (
                   <tr key={appointment.id} className="border-t border-slate-100 dark:border-slate-800 dark:text-slate-200">
                     <td className="px-5 py-4 font-semibold">{appointment.id}</td>
@@ -134,6 +174,13 @@ export default function AppointmentsPage() {
                     </td>
                   </tr>
                 ))}
+                {!isLoading && filteredAppointments.length === 0 && (
+                  <tr className="border-t border-slate-100 dark:border-slate-800">
+                    <td colSpan={8} className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                      No appointments found.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

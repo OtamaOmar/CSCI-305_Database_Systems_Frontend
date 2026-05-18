@@ -1,7 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react'
-
-const AlertContext = createContext(null)
+import { AlertContext } from './AlertContext'
 
 const toneStyles = {
   info: {
@@ -238,12 +237,4 @@ export function AlertProvider({ children }) {
       )}
     </AlertContext.Provider>
   )
-}
-
-export function useAlert() {
-  const context = useContext(AlertContext)
-  if (!context) {
-    throw new Error('useAlert must be used within AlertProvider')
-  }
-  return context
 }

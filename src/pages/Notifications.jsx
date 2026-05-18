@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
 import { AlertTriangle, Bell, CheckCircle2, Clock, Info, ShieldCheck, Siren } from 'lucide-react'
+import useAlert from '../hooks/useAlert'
+import { apiFetch } from '../lib/api'
 
 const iconMap = { CheckCircle2, ShieldCheck, Info }
 
@@ -11,8 +13,10 @@ const alertToneClass = {
 }
 
 function Notifications() {
+  const { notify } = useAlert()
   const [emergencyAlerts, setEmergencyAlerts] = useState([])
   const [systemNotifications, setSystemNotifications] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
 
@@ -23,16 +27,32 @@ function Notifications() {
   })
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/notifications')
-      .then((res) => res.json())
-      .then((data) => {
-        setEmergencyAlerts(data.filter((item) => item.type === 'emergency'))
+    let isMounted = true
+
+    const load = async () => {
+      setIsLoading(true)
+      try {
+        const data = await apiFetch('/api/notifications')
+        if (!isMounted) return
+
+        setEmergencyAlerts((data || []).filter((item) => item.type === 'emergency'))
         setSystemNotifications(
-          data
-            .filter((item) => item.type === 'system')
-            .map((item) => ({ ...item, icon: iconMap[item.icon] ?? Info })),
+          (data || [])
+            .filter((item) => item.type !== 'emergency')
+            .map((item) => ({ ...item, icon: iconMap[item.icon] ?? Info }))
         )
-      })
+      } catch (err) {
+        if (!isMounted) return
+        notify({ tone: 'error', message: err.message })
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   useEffect(() => {
@@ -74,6 +94,11 @@ function Notifications() {
               <p className="text-sm text-slate-500 dark:text-slate-400">Live alerts from triage and ICU.</p>
             </div>
             <ul>
+              {isLoading && (
+                <li className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                  Loading alerts…
+                </li>
+              )}
               {emergencyAlerts.map((alert) => (
                 <li
                   key={alert.id}
@@ -94,6 +119,11 @@ function Notifications() {
                   </span>
                 </li>
               ))}
+              {!isLoading && emergencyAlerts.length === 0 && (
+                <li className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                  No emergency alerts.
+                </li>
+              )}
             </ul>
           </article>
 
@@ -103,6 +133,11 @@ function Notifications() {
               <p className="text-sm text-slate-500 dark:text-slate-400">Operational updates and reminders.</p>
             </div>
             <ul>
+              {isLoading && (
+                <li className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                  Loading notifications…
+                </li>
+              )}
               {systemNotifications.map((item) => {
                 const Icon = item.icon
 
@@ -124,6 +159,11 @@ function Notifications() {
                   </li>
                 )
               })}
+              {!isLoading && systemNotifications.length === 0 && (
+                <li className="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+                  No system notifications.
+                </li>
+              )}
             </ul>
           </article>
         </section>
